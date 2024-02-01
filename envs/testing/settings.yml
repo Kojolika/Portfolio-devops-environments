@@ -1,3 +1,11 @@
-# Testing
-docker:
-  image:
+# stuff from base
+resouces:
+- ../../base
+
+# stuff from variants
+components:
+
+
+specifics:
+  - deployment.yml
+  - version.yml
