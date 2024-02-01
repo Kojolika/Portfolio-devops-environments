@@ -1,0 +1,5 @@
+# Testing
+deployment:
+  ports:
+    port: 8080
+    protocol: tcp
