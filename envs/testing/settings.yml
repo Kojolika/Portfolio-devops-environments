@@ -1,6 +1,6 @@
 # stuff from base
 resources:
-- ../../base
+- ../../base/settings.yml
 
 # stuff from variants
 components:

@@ -1,5 +1,6 @@
 # Testing
 deployment:
+  domain: andrewmyshok.com
   ports:
     port: 8080
     protocol: tcp
