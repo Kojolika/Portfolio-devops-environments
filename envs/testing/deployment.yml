@@ -3,4 +3,4 @@ containers:
     target_dir: /app
     subdomain: dev
     env:
-      # Insert specific env variables here
+      ENVIRONMENT: development

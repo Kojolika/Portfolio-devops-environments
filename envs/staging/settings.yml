@@ -1,0 +1,11 @@
+# stuff from base
+resources:
+- ../../base/settings.yml
+
+# stuff from variants
+components:
+
+
+specifics:
+  - deployment.yml
+  - version.yml
