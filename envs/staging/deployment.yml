@@ -2,5 +2,5 @@ containers:
   - name: staging
     target_dir: /app
     subdomain: staging
-    env:
-      ENVIRONMENT: production
+    environment: production
+

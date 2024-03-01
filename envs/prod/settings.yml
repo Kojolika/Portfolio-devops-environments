@@ -7,5 +7,5 @@ components:
 
 
 specifics:
-  - deployment.yml
-  - version.yml
+  deployment: deployment.yml
+  version: version.yml

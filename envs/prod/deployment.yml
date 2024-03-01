@@ -2,5 +2,4 @@ containers:
   - name: prod
     target_dir: /app
     subdomain: ""
-    env:
-      ENVIRONMENT: production
+    environment: production

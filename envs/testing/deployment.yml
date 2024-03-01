@@ -2,5 +2,5 @@ containers:
   - name: dev
     target_dir: /app
     subdomain: dev
-    env:
-      ENVIRONMENT: development
+    ec2-zone: us-east-2
+    environment: development
