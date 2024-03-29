@@ -7,7 +7,6 @@ on:
 
 jobs:
   EC2-deploy:
-    needs: create-image
     runs-on: ubuntu-latest
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
