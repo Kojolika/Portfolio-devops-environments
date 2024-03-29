@@ -1,0 +1,99 @@
+name: Deploy App to Dev Server
+
+on:
+  repository_dispatch:
+    types: [pr-merged-to-main]
+
+jobs:
+  # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
+  # Then make sure the docker daemon is running
+  # Also make sure to create a docker group on the EC2 instance before running docker commands, otherwise
+  # the EC2 instance won't have permissions for those docker commands (without using sudo for linux)
+  EC2-deploy:
+    needs: create-image
+    runs-on: ubuntu-latest
+
+    env:
+      ENV_CONFIG_PATH: envs/testing/
+      ENV_CONFIG_FILE: settings.yml
+      APP_REPO_CHECKOUT_PATH: app
+      REPO_CHECKOUT_PATH: portfolio
+      EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
+      EC2_IP: ${{ secrets.EC2_IP_DEV }}
+      DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+
+    steps:
+      - name: set current runner path as env var
+        run: |
+          echo "WORK_DIR=$(pwd)" >> "$GITHUB_ENV"
+
+      - name: setup yq
+        uses: mikefarah/yq@master
+
+      - name: checkout repo
+        uses: actions/checkout@v4
+
+      - name: checkout app repo file
+        uses: actions/checkout@v4
+        with:
+          repository: "https://github.com/Kojolika/Portfolio"
+          path: ${{ env.APP_REPO_CHECKOUT_PATH }}
+          ref: "main"
+
+      - name: get port and protocol settings
+        run: |
+          cd $ENV_CONFIG_PATH
+          echo -n "PORT=" >> "$GITHUB_ENV" && yq 'load(.resources[0]) | .deployment.ports.port' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
+          echo -n "AWS_ZONE=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .ec2-zone' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
+          echo -n "NODE_ENV=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .environment' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
+      
+      - name: set ssh identity on github runner
+        run: |
+          SSH_DIR=~/.ssh
+          mkdir -p $SSH_DIR
+          chmod 700 $SSH_DIR
+          cd $SSH_DIR
+          ssh-keyscan $EC2_IP > known_hosts
+          echo "$SSH_KEY" > $SSH_PRIVATE_KEY_FILE
+          chmod 600 *
+          eval `ssh-agent -s`
+          ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
+
+        env:
+          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          SSH_PRIVATE_KEY_FILE: id_rsa
+
+      - name: set env variables for docker-compose
+        run: |
+          cd ${WORK_DIR}
+          echo "NODE_ENV=$NODE_ENV" >> .env
+          echo "PORT=$PORT" >> .env
+          echo "AWS_ZONE=$AWS_ZONE" >> .env
+          echo "BUILD=${VERSION}+${BUILD}" >> .env
+          echo "LATEST_IMAGE=${DOCKER_REPO}:latest-${VERSION}-${BUILD}" >> .env
+          
+        env:
+          VERSION: ${{ github.event.client_payload.version }}
+          BUILD: ${{ github.event.client_payload.build }}
+          DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
+ 
+      - name: run commands on ec2 through ssh
+        run: |
+          docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
+          docker context use $EC2_CONTEXT
+          echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin
+          docker-compose down
+          docker system prune -a -f
+          docker-compose up -d
+
+        env:
+          EC2_CONTEXT: ec2
+
+      - name: check if both containers are running
+        # We subtract 1 since we're counting the lines of the stdin, the first line is the table header
+        run: |
+          NUM_CONTAINERS=$(($(docker ps | wc -l) - 1))
+          if(( NUM_CONTAINERS < 2 )); then
+            exit 1;
+          fi
