@@ -1,8 +1,9 @@
 name: Deploy App to Dev Server
 
 on:
-  repository_dispatch:
-    types: [pr-merged-to-main]
+  push:
+#  repository_dispatch:
+#    types: [pr-merged-to-main]
 
 jobs:
   EC2-deploy:
