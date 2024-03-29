@@ -38,7 +38,7 @@ jobs:
       - name: checkout app repo file
         uses: actions/checkout@v4
         with:
-          repository: "https://github.com/Kojolika/Portfolio"
+          repository: "Kojolika/Portfolio"
           path: ${{ env.APP_REPO_CHECKOUT_PATH }}
           ref: "main"
 
