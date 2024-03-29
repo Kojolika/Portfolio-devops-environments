@@ -5,13 +5,14 @@ on:
     types: [pr-merged-to-main]
 
 jobs:
-  # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
-  # Then make sure the docker daemon is running
-  # Also make sure to create a docker group on the EC2 instance before running docker commands, otherwise
-  # the EC2 instance won't have permissions for those docker commands (without using sudo for linux)
   EC2-deploy:
     needs: create-image
     runs-on: ubuntu-latest
+
+    # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
+    # Then make sure the docker daemon is running
+    # Also make sure to create a docker group on the EC2 instance before running docker commands, otherwise
+    # the EC2 instance won't have permissions for those docker commands (without using sudo for linux)
 
     env:
       ENV_CONFIG_PATH: envs/testing/
