@@ -18,6 +18,7 @@ jobs:
       ENV_CONFIG_PATH: envs/testing/
       ENV_CONFIG_FILE: settings.yml
       APP_REPO_CHECKOUT_PATH: app
+      ENV_REPO_CHECKOUT_PATH: env
       EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
       EC2_IP: ${{ secrets.EC2_IP_DEV }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
@@ -43,6 +44,7 @@ jobs:
 
       - name: get port and protocol settings
         run: |
+          cd $ENV_REPO_CHECKOUT_PATH
           cd $ENV_CONFIG_PATH
           echo -n "PORT=" >> "$GITHUB_ENV" && yq 'load(.resources[0]) | .deployment.ports.port' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
           echo -n "AWS_ZONE=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .ec2-zone' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
@@ -80,7 +82,6 @@ jobs:
  
       - name: run commands on ec2 through ssh
         run: |
-          cd ${APP_REPO_CHECKOUT_PATH}
           docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
           docker context use $EC2_CONTEXT
           echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin
