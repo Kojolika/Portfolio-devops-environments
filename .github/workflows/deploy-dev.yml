@@ -25,15 +25,13 @@ jobs:
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
     steps:
-      - name: set current runner path as env var
-        run: |
-          echo "WORK_DIR=$(pwd)" >> "$GITHUB_ENV"
-
       - name: setup yq
         uses: mikefarah/yq@master
 
       - name: checkout repo
         uses: actions/checkout@v4
+        with:
+          path: ${{ env.ENV_REPO_CHECKOUT_PATH }}
 
       - name: checkout app repo file
         uses: actions/checkout@v4
@@ -68,7 +66,7 @@ jobs:
 
       - name: set env variables for docker-compose
         run: |
-          cd ${WORK_DIR}
+          cd ${GITHUB_WORKSPACE}
           echo "NODE_ENV=$NODE_ENV" >> .env
           echo "PORT=$PORT" >> .env
           echo "AWS_ZONE=$AWS_ZONE" >> .env
