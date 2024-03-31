@@ -30,8 +30,6 @@ jobs:
 
       - name: checkout repo
         uses: actions/checkout@v4
-        with:
-          path: ${{ env.ENV_REPO_CHECKOUT_PATH }}
 
       - name: checkout app repo file
         uses: actions/checkout@v4
@@ -42,7 +40,7 @@ jobs:
 
       - name: get port and protocol settings
         run: |
-          cd $ENV_REPO_CHECKOUT_PATH
+          ls
           cd $ENV_CONFIG_PATH
           echo -n "PORT=" >> "$GITHUB_ENV" && yq 'load(.resources[0]) | .deployment.ports.port' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
           echo -n "AWS_ZONE=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .ec2-zone' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
