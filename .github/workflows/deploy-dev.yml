@@ -63,6 +63,7 @@ jobs:
       - name: set env variables for docker-compose
         run: |
           cd ${GITHUB_WORKSPACE}
+          cd $APP_REPO_CHECKOUT_PATH
           echo "NODE_ENV=$NODE_ENV" >> .env
           echo "PORT=$PORT" >> .env
           echo "AWS_ZONE=$AWS_ZONE" >> .env
@@ -76,7 +77,6 @@ jobs:
  
       - name: run commands on ec2 through ssh
         run: |
-          cd $APP_REPO_CHECKOUT_PATH
           docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
           docker context use $EC2_CONTEXT
           echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin
