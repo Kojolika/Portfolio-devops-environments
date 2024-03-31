@@ -46,6 +46,7 @@ jobs:
 
       - name: get build and verison number
         run: |
+          cd $ENV_CONFIG_PATH
           IMAGE=$(yq 'load(.specifics.version) | .spec.containers[] | select(.app-name == "portfolio") | .image' $ENV_CONFIG_FILE)
           if [[ -z $(echo "$IMAGE" | grep -P -o "[0-9]+\.[0-9]+\.[0-9]+\-[0-9]+") ]]; then
               if [ ! "$IMAGE" = "latest"]; then
