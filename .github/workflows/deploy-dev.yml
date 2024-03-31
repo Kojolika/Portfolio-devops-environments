@@ -51,10 +51,20 @@ jobs:
               if [ ! "$IMAGE" = "latest"]; then
                 exit 1;
               fi
-              
+            echo "::add-mask::$ACCESS_TOKEN"
+            ACCESS_TOKEN=$(curl https://hub.docker.com/v2/users/login -d "username=$DOCKER_USERNAME" -d "password=$DOCKER_PASSWORD" | yq '.token')
+            echo "::add-mask::$REPO_RESULTS"
+            REPO_RESULTS=$(curl https://hub.docker.com/v2/namespaces/myshoka/repositories/portfolio/tags -H "Authorization: Bearer $ACCESS_TOKEN")
+            echo "::add-mask::$LATEST_SHA"
+            LATEST_SHA=$(echo "$REPO_RESULTS" | image="$IMAGE" yq '.results[] | select(.name == env(image)) | .digest')
+            echo "::add-mask::$LATEST_VERSION"
+            LATEST_VERSION=$(echo "$REPO_RESULTS" | latest_sha="$LATEST_SHA" image="$IMAGE" yq '.results[] | select(.digest == env(latest_sha) and .name != env(image)) | .name')
+
+            echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$LATEST_VERSION" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+" >> "$GITHUB_ENV"
+            echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$LATEST_VERSION" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
           else
-            VERSION=$(echo "$IMAGE" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+")
-            BUILD=$(echo "$IMAGE" |  grep -P -o "(?<=\-)[0-9]+")
+            echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+" >> "$GITHUB_ENV"
+            echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
           fi
       
       - name: set ssh identity on github runner
