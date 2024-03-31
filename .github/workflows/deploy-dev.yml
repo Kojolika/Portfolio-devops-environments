@@ -52,14 +52,14 @@ jobs:
               if [ ! "$IMAGE" = "latest"]; then
                 exit 1;
               fi
-            echo "::add-mask::$ACCESS_TOKEN"
             ACCESS_TOKEN=$(curl https://hub.docker.com/v2/users/login -d "username=$DOCKER_USERNAME" -d "password=$DOCKER_PASSWORD" | yq '.token')
-            echo "::add-mask::$REPO_RESULTS"
+            echo "::add-mask::$ACCESS_TOKEN"
             REPO_RESULTS=$(curl https://hub.docker.com/v2/namespaces/myshoka/repositories/portfolio/tags -H "Authorization: Bearer $ACCESS_TOKEN")
-            echo "::add-mask::$LATEST_SHA"
+            echo "::add-mask::$REPO_RESULTS"
             LATEST_SHA=$(echo "$REPO_RESULTS" | image="$IMAGE" yq '.results[] | select(.name == env(image)) | .digest')
-            echo "::add-mask::$LATEST_VERSION"
+            echo "::add-mask::$LATEST_SHA"
             LATEST_VERSION=$(echo "$REPO_RESULTS" | latest_sha="$LATEST_SHA" image="$IMAGE" yq '.results[] | select(.digest == env(latest_sha) and .name != env(image)) | .name')
+            echo "::add-mask::$LATEST_VERSION"
 
             echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$LATEST_VERSION" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+" >> "$GITHUB_ENV"
             echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$LATEST_VERSION" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
