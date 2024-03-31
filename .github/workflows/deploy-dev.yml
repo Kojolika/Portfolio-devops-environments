@@ -43,6 +43,19 @@ jobs:
           echo -n "PORT=" >> "$GITHUB_ENV" && yq 'load(.resources[0]) | .deployment.ports.port' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
           echo -n "AWS_ZONE=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .ec2-zone' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
           echo -n "NODE_ENV=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .environment' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
+
+      - name: get build and verison number
+        run: |
+          IMAGE=$(yq 'load(.specifics.version) | .spec.containers[] | select(.app-name == "portfolio") | .image' $ENV_CONFIG_FILE)
+          if [[ -z $(echo "$IMAGE" | grep -P -o "[0-9]+\.[0-9]+\.[0-9]+\-[0-9]+") ]]; then
+              if [ ! "$IMAGE" = "latest"]; then
+                exit 1;
+              fi
+              
+          else
+            VERSION=$(echo "$IMAGE" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+")
+            BUILD=$(echo "$IMAGE" |  grep -P -o "(?<=\-)[0-9]+")
+          fi
       
       - name: set ssh identity on github runner
         run: |
@@ -68,11 +81,9 @@ jobs:
           echo "PORT=$PORT" >> .env
           echo "AWS_ZONE=$AWS_ZONE" >> .env
           echo "BUILD=${VERSION}+${BUILD}" >> .env
-          echo "LATEST_IMAGE=${DOCKER_REPO}:latest-${VERSION}-${BUILD}" >> .env
+          echo "LATEST_IMAGE=${DOCKER_REPO}:latest" >> .env
           
         env:
-          VERSION: ${{ github.event.client_payload.version }}
-          BUILD: ${{ github.event.client_payload.build }}
           DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
  
       - name: run commands on ec2 through ssh
