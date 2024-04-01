@@ -5,6 +5,9 @@ on:
   repository_dispatch:
     types: [pr-merged-to-main]
 
+permissions:
+  contents: write
+
 jobs:
   EC2-Deploy:
     runs-on: ubuntu-latest
