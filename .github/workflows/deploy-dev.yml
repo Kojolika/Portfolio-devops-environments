@@ -2,6 +2,7 @@ name: Deploy App to Dev Server
 
 on:
   push:
+    paths: ['envs/testing/settings.yml']
   repository_dispatch:
     types: [pr-merged-to-main]
 
