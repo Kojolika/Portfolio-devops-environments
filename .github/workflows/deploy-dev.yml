@@ -175,7 +175,7 @@ jobs:
             build=$BUILD yq -i '.build = env(build)' ${{ env.VERSION_CONFIG }}
             HAS_FILE_BEEN_UPDATED="true"
           fi
-          if[[ $HAS_FILE_BEEN_UPDATED = "true" ]]; then
+          if[[ "$HAS_FILE_BEEN_UPDATED" = "true" ]]; then
             git config --global user.email ${{ secrets.ACTIONS_COMMIT_EMAIL}}
             git config --global user.name ${{ secrets.ACTIONS_COMMIT_NAME }}
             git add ${{ env.VERSION_CONFIG }}
