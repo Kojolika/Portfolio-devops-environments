@@ -2,17 +2,21 @@ name: Deploy App to Dev Server
 
 on:
   push:
-#  repository_dispatch:
-#    types: [pr-merged-to-main]
+  repository_dispatch:
+    types: [pr-merged-to-main]
 
 jobs:
-  EC2-deploy:
+  EC2-Deploy:
     runs-on: ubuntu-latest
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
     # Then make sure the docker daemon is running
     # Also make sure to create a docker group on the EC2 instance before running docker commands, otherwise
     # the EC2 instance won't have permissions for those docker commands (without using sudo for linux)
+
+    outputs:
+      build: ${{ steps.version-outputs.outputs.BUILD }}
+      version: ${{ steps.version-outputs.outputs.VERSION }}
 
     env:
       ENV_CONFIG_PATH: envs/testing/
@@ -48,6 +52,7 @@ jobs:
         run: |
           cd $ENV_CONFIG_PATH
           IMAGE=$(yq 'load(.specifics.version) | .spec.containers[] | select(.app-name == "portfolio") | .image' $ENV_CONFIG_FILE)
+          echo -n "IMAGE=" >> "$GITHUB_ENV" && echo "$IMAGE" >> "$GITHUB_ENV"
           if [[ -z $(echo "$IMAGE" | grep -P -o "[0-9]+\.[0-9]+\.[0-9]+\-[0-9]+") ]]; then
               if [ ! "$IMAGE" = "latest"]; then
                 exit 1;
@@ -68,6 +73,11 @@ jobs:
             echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
           fi
       
+      - id: version-outputs
+        run: |
+          echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$VERSION" >> "$GITHUB_OUTPUT"
+          echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$BUILD">> "$GITHUB_OUTPUT"
+
       - name: set ssh identity on github runner
         run: |
           SSH_DIR=~/.ssh
@@ -92,7 +102,7 @@ jobs:
           echo "PORT=$PORT" >> .env
           echo "AWS_ZONE=$AWS_ZONE" >> .env
           echo "BUILD=${VERSION}+${BUILD}" >> .env
-          echo "LATEST_IMAGE=${DOCKER_REPO}:latest" >> .env
+          echo "LATEST_IMAGE=${DOCKER_REPO}:${IMAGE}" >> .env
           
         env:
           DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
@@ -117,3 +127,46 @@ jobs:
           if(( NUM_CONTAINERS < 2 )); then
             exit 1;
           fi
+  
+  Set-Version-In-Repo:
+    runs-on: ubuntu-latest
+    needs: EC2-Deploy
+
+    env:
+      VERSION_CONFIG: envs/testing/version.yml
+      BRANCH: main
+
+    steps:
+      - name: retreive build and version number from previous job
+        run: |
+            echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$BUILD" >> "$GITHUB_ENV"
+            echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$VERSION" >> "$GITHUB_ENV"
+        env:
+          BUILD: ${{ needs.EC2-Deploy.outputs.build }}
+          VERSION: ${{ needs.EC2-Deploy.outputs.version }}
+
+      - name: setup yq
+        uses: mikefarah/yq@master
+
+      - name: checkout repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ${{ env.VERSION_CONFIG }}
+          sparse-checkout-cone-mode: false
+      
+      - name: update version and build if outdated
+        run: |
+          CURRENT_VERSION=$(yq '.app-version' ${{ env.VERSION_CONFIG }})
+          CURRENT_BUILD=$(yq '.build' ${{ env.VERSION_CONFIG }})
+          if [[ ! $CURRENT_VERSION -eq $VERSION ]]
+            version=$VERSION yq -i '.app-version = env(version)' ${{ env.VERSION_CONFIG }}
+          fi
+          if [[ ! $CURRENT_BUILD -eq $BUILD ]]
+            build=$BUILD yq -i '.build = env(build)' ${{ env.VERSION_CONFIG }}
+          fi
+          git config --global user.email ${{ secrets.ACTIONS_COMMIT_EMAIL}}
+          git config --global user.name ${{ secrets.ACTIONS_COMMIT_NAME }}
+          git add ${{ env.VERSION_CONFIG }}
+          git commit -m "Set version according to image via Github Actions"
+          git push origin ${{ env.BRANCH }}
