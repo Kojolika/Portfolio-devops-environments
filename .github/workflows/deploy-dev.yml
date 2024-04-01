@@ -161,7 +161,7 @@ jobs:
           git config --global user.name ${{ secrets.ACTIONS_COMMIT_NAME }}
           git add ${{ env.VERSION_CONFIG }}
           git commit -m "Set version according to image via Github Actions"
-          git push origin ${{ env.BRANCH }}
+          git push origin $GITHUB_REF_NAME
 
         env:
           BUILD: ${{ needs.EC2-Deploy.outputs.build }}
