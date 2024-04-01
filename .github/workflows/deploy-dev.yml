@@ -39,7 +39,7 @@ jobs:
         id: get-ip
         run: |
           EC2_IP=$(aws --region "$AWS_ZONE" \
-          ec2 describe-instance --filters \
+          ec2 describe-instances --filters \
           "Name=instance-state-id, Values=running" \
           "Name=instance-id, Values=${{ secrets.EC2_INSTANCE_ID_DEV }}" \
           --query "Reservations[*].Instances[*].[PublicIpAddress]" \
