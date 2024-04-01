@@ -166,17 +166,22 @@ jobs:
         run: |
           CURRENT_VERSION=$(yq '.app-version' ${{ env.VERSION_CONFIG }})
           CURRENT_BUILD=$(yq '.build' ${{ env.VERSION_CONFIG }})
+          HAS_FILE_BEEN_UPDATED="false"
           if [[ ! "$CURRENT_VERSION" = "$VERSION" ]]; then
             version=$VERSION yq -i '.app-version = env(version)' ${{ env.VERSION_CONFIG }}
+            HAS_FILE_BEEN_UPDATED="true"
           fi
           if [[ ! $CURRENT_BUILD -eq $BUILD ]]; then
             build=$BUILD yq -i '.build = env(build)' ${{ env.VERSION_CONFIG }}
+            HAS_FILE_BEEN_UPDATED="true"
           fi
-          git config --global user.email ${{ secrets.ACTIONS_COMMIT_EMAIL}}
-          git config --global user.name ${{ secrets.ACTIONS_COMMIT_NAME }}
-          git add ${{ env.VERSION_CONFIG }}
-          git commit -m "Set version according to image via Github Actions"
-          git push origin $GITHUB_REF_NAME
+          if[[ $HAS_FILE_BEEN_UPDATED = "true "]]; then
+            git config --global user.email ${{ secrets.ACTIONS_COMMIT_EMAIL}}
+            git config --global user.name ${{ secrets.ACTIONS_COMMIT_NAME }}
+            git add ${{ env.VERSION_CONFIG }}
+            git commit -m "Set version according to image via Github Actions"
+            git push origin $GITHUB_REF_NAME
+          fi
 
         env:
           BUILD: ${{ needs.EC2-Deploy.outputs.build }}
