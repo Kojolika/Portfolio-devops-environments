@@ -38,7 +38,7 @@ jobs:
       - name: get ec2 ip
         id: get-ip
         run: |
-          EC2_IP=$(aws --version "$AWS_ZONE" \
+          EC2_IP=$(aws --region "$AWS_ZONE" \
           ec2 describe-instance --filters \
           "Name=instance-state-id, Values=running" \
           "Name=instance-id, Values=${{ secrets.EC2_INSTANCE_ID_DEV }}" \
@@ -114,10 +114,15 @@ jobs:
             echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
           fi
       
-      - id: version-outputs
+      - name: add version and build to job outputs
+        id: version-outputs
         run: |
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "BUILD=$BUILD" >> "$GITHUB_OUTPUT"
+      
+      - name: hide EC2 ip
+        run: |
+          echo "::add-mask::$EC2_IP"
 
       - name: set ssh identity on github runner
         run: |
