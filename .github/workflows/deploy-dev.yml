@@ -75,8 +75,8 @@ jobs:
       
       - id: version-outputs
         run: |
-          echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$VERSION" >> "$GITHUB_OUTPUT"
-          echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$BUILD">> "$GITHUB_OUTPUT"
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "BUILD=$BUILD" >> "$GITHUB_ENV"
 
       - name: set ssh identity on github runner
         run: |
