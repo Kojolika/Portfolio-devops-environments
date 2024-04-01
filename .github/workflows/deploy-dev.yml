@@ -2,7 +2,7 @@ name: Deploy App to Dev Server
 
 on:
   push:
-    paths: ['envs/testing/settings.yml']
+#    paths: ['envs/testing/settings.yml']
   repository_dispatch:
     types: [pr-merged-to-main]
 
@@ -10,6 +10,17 @@ permissions:
   contents: write
 
 jobs:
+  Get-EC2-IP:
+    runs-on: ubuntu-latest
+
+    steps:
+      - id: install-aws-cli
+        uses: unfor19/install-aws-cli-action@v1
+
+      - name: test aws
+        run: |
+          aws --version
+
   EC2-Deploy:
     runs-on: ubuntu-latest
 
