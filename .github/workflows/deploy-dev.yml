@@ -1,12 +1,15 @@
 name: Deploy App to Dev Server
 
 on:
+  push:
   repository_dispatch:
     types: [pr-merged-to-main]
 
+permissions:
+  contents: write
+
 jobs:
-  EC2-deploy:
-    needs: create-image
+  EC2-Deploy:
     runs-on: ubuntu-latest
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
@@ -14,21 +17,20 @@ jobs:
     # Also make sure to create a docker group on the EC2 instance before running docker commands, otherwise
     # the EC2 instance won't have permissions for those docker commands (without using sudo for linux)
 
+    outputs:
+      build: ${{ steps.version-outputs.outputs.BUILD }}
+      version: ${{ steps.version-outputs.outputs.VERSION }}
+
     env:
       ENV_CONFIG_PATH: envs/testing/
       ENV_CONFIG_FILE: settings.yml
       APP_REPO_CHECKOUT_PATH: app
-      REPO_CHECKOUT_PATH: portfolio
       EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
       EC2_IP: ${{ secrets.EC2_IP_DEV }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
     steps:
-      - name: set current runner path as env var
-        run: |
-          echo "WORK_DIR=$(pwd)" >> "$GITHUB_ENV"
-
       - name: setup yq
         uses: mikefarah/yq@master
 
@@ -38,7 +40,7 @@ jobs:
       - name: checkout app repo file
         uses: actions/checkout@v4
         with:
-          repository: "https://github.com/Kojolika/Portfolio"
+          repository: "Kojolika/Portfolio"
           path: ${{ env.APP_REPO_CHECKOUT_PATH }}
           ref: "main"
 
@@ -48,7 +50,37 @@ jobs:
           echo -n "PORT=" >> "$GITHUB_ENV" && yq 'load(.resources[0]) | .deployment.ports.port' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
           echo -n "AWS_ZONE=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .ec2-zone' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
           echo -n "NODE_ENV=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .environment' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
+
+      - name: get build and verison number
+        run: |
+          cd $ENV_CONFIG_PATH
+          IMAGE=$(yq 'load(.specifics.version) | .spec.containers[] | select(.app-name == "portfolio") | .image' $ENV_CONFIG_FILE)
+          echo -n "IMAGE=" >> "$GITHUB_ENV" && echo "$IMAGE" >> "$GITHUB_ENV"
+          if [[ -z $(echo "$IMAGE" | grep -P -o "[0-9]+\.[0-9]+\.[0-9]+\-[0-9]+") ]]; then
+              if [ ! "$IMAGE" = "latest"]; then
+                exit 1;
+              fi
+            ACCESS_TOKEN=$(curl https://hub.docker.com/v2/users/login -d "username=$DOCKER_USERNAME" -d "password=$DOCKER_PASSWORD" | yq '.token')
+            echo "::add-mask::$ACCESS_TOKEN"
+            REPO_RESULTS=$(curl https://hub.docker.com/v2/namespaces/myshoka/repositories/portfolio/tags -H "Authorization: Bearer $ACCESS_TOKEN")
+            echo "::add-mask::$REPO_RESULTS"
+            LATEST_SHA=$(echo "$REPO_RESULTS" | image="$IMAGE" yq '.results[] | select(.name == env(image)) | .digest')
+            echo "::add-mask::$LATEST_SHA"
+            LATEST_VERSION=$(echo "$REPO_RESULTS" | latest_sha="$LATEST_SHA" image="$IMAGE" yq '.results[] | select(.digest == env(latest_sha) and .name != env(image)) | .name')
+            echo "::add-mask::$LATEST_VERSION"
+
+            echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$LATEST_VERSION" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+" >> "$GITHUB_ENV"
+            echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$LATEST_VERSION" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
+          else
+            echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+" >> "$GITHUB_ENV"
+            echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
+          fi
       
+      - id: version-outputs
+        run: |
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "BUILD=$BUILD" >> "$GITHUB_OUTPUT"
+
       - name: set ssh identity on github runner
         run: |
           SSH_DIR=~/.ssh
@@ -67,20 +99,20 @@ jobs:
 
       - name: set env variables for docker-compose
         run: |
-          cd ${WORK_DIR}
+          cd ${GITHUB_WORKSPACE}
+          cd $APP_REPO_CHECKOUT_PATH
           echo "NODE_ENV=$NODE_ENV" >> .env
           echo "PORT=$PORT" >> .env
           echo "AWS_ZONE=$AWS_ZONE" >> .env
           echo "BUILD=${VERSION}+${BUILD}" >> .env
-          echo "LATEST_IMAGE=${DOCKER_REPO}:latest-${VERSION}-${BUILD}" >> .env
+          echo "LATEST_IMAGE=${DOCKER_REPO}:${IMAGE}" >> .env
           
         env:
-          VERSION: ${{ github.event.client_payload.version }}
-          BUILD: ${{ github.event.client_payload.build }}
           DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
  
       - name: run commands on ec2 through ssh
         run: |
+          cd $APP_REPO_CHECKOUT_PATH
           docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
           docker context use $EC2_CONTEXT
           echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin
@@ -98,3 +130,42 @@ jobs:
           if(( NUM_CONTAINERS < 2 )); then
             exit 1;
           fi
+  
+  Set-Version-In-Repo:
+    runs-on: ubuntu-latest
+    needs: EC2-Deploy
+
+    env:
+      VERSION_CONFIG: envs/testing/version.yml
+      BRANCH: main
+
+    steps:
+      - name: setup yq
+        uses: mikefarah/yq@master
+
+      - name: checkout repo
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            ${{ env.VERSION_CONFIG }}
+          sparse-checkout-cone-mode: false
+      
+      - name: update version and build if outdated
+        run: |
+          CURRENT_VERSION=$(yq '.app-version' ${{ env.VERSION_CONFIG }})
+          CURRENT_BUILD=$(yq '.build' ${{ env.VERSION_CONFIG }})
+          if [[ ! "$CURRENT_VERSION" = "$VERSION" ]]; then
+            version=$VERSION yq -i '.app-version = env(version)' ${{ env.VERSION_CONFIG }}
+          fi
+          if [[ ! $CURRENT_BUILD -eq $BUILD ]]; then
+            build=$BUILD yq -i '.build = env(build)' ${{ env.VERSION_CONFIG }}
+          fi
+          git config --global user.email ${{ secrets.ACTIONS_COMMIT_EMAIL}}
+          git config --global user.name ${{ secrets.ACTIONS_COMMIT_NAME }}
+          git add ${{ env.VERSION_CONFIG }}
+          git commit -m "Set version according to image via Github Actions"
+          git push origin $GITHUB_REF_NAME
+
+        env:
+          BUILD: ${{ needs.EC2-Deploy.outputs.build }}
+          VERSION: ${{ needs.EC2-Deploy.outputs.version }}
