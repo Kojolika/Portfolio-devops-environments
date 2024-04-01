@@ -151,7 +151,7 @@ jobs:
         run: |
           CURRENT_VERSION=$(yq '.app-version' ${{ env.VERSION_CONFIG }})
           CURRENT_BUILD=$(yq '.build' ${{ env.VERSION_CONFIG }})
-          if [[ ! $CURRENT_VERSION -eq $VERSION ]]; then
+          if [[ ! "$CURRENT_VERSION" = "$VERSION" ]]; then
             version=$VERSION yq -i '.app-version = env(version)' ${{ env.VERSION_CONFIG }}
           fi
           if [[ ! $CURRENT_BUILD -eq $BUILD ]]; then
