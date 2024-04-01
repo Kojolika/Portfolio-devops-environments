@@ -75,8 +75,8 @@ jobs:
       
       - id: version-outputs
         run: |
-          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
-          echo "BUILD=$BUILD" >> "$GITHUB_ENV"
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "BUILD=$BUILD" >> "$GITHUB_OUTPUT"
 
       - name: set ssh identity on github runner
         run: |
@@ -137,14 +137,6 @@ jobs:
       BRANCH: main
 
     steps:
-      - name: retreive build and version number from previous job
-        run: |
-            echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$BUILD" >> "$GITHUB_ENV"
-            echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$VERSION" >> "$GITHUB_ENV"
-        env:
-          BUILD: ${{ needs.EC2-Deploy.outputs.build }}
-          VERSION: ${{ needs.EC2-Deploy.outputs.version }}
-
       - name: setup yq
         uses: mikefarah/yq@master
 
@@ -170,3 +162,7 @@ jobs:
           git add ${{ env.VERSION_CONFIG }}
           git commit -m "Set version according to image via Github Actions"
           git push origin ${{ env.BRANCH }}
+
+        env:
+          BUILD: ${{ needs.EC2-Deploy.outputs.build }}
+          VERSION: ${{ needs.EC2-Deploy.outputs.version }}
