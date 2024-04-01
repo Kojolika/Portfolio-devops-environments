@@ -59,7 +59,7 @@ jobs:
             LATEST_SHA=$(echo "$REPO_RESULTS" | image="$IMAGE" yq '.results[] | select(.name == env(image)) | .digest')
             echo "::add-mask::$LATEST_SHA"
             LATEST_VERSION=$(echo "$REPO_RESULTS" | latest_sha="$LATEST_SHA" image="$IMAGE" yq '.results[] | select(.digest == env(latest_sha) and .name != env(image)) | .name')
-            echo "latest version: $LATEST_VERSION"
+            echo "::add-mask::$LATEST_VERSION"
 
             echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$LATEST_VERSION" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+" >> "$GITHUB_ENV"
             echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$LATEST_VERSION" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
