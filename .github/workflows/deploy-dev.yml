@@ -159,10 +159,10 @@ jobs:
         run: |
           CURRENT_VERSION=$(yq '.app-version' ${{ env.VERSION_CONFIG }})
           CURRENT_BUILD=$(yq '.build' ${{ env.VERSION_CONFIG }})
-          if [[ ! $CURRENT_VERSION -eq $VERSION ]]
+          if [[ ! $CURRENT_VERSION -eq $VERSION ]]; then
             version=$VERSION yq -i '.app-version = env(version)' ${{ env.VERSION_CONFIG }}
           fi
-          if [[ ! $CURRENT_BUILD -eq $BUILD ]]
+          if [[ ! $CURRENT_BUILD -eq $BUILD ]]; then
             build=$BUILD yq -i '.build = env(build)' ${{ env.VERSION_CONFIG }}
           fi
           git config --global user.email ${{ secrets.ACTIONS_COMMIT_EMAIL}}
