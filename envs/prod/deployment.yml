@@ -1,5 +1,5 @@
-containers:
-  - name: prod
-    target_dir: /app
-    subdomain: ""
-    environment: production
+app:
+  name: prod
+  target_dir: /app
+  subdomain: ""
+  environment: production

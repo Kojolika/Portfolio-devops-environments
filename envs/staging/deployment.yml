@@ -1,6 +1,6 @@
-containers:
-  - name: staging
-    target_dir: /app
-    subdomain: staging
-    environment: production
+app:
+  name: staging
+  target_dir: /app
+  subdomain: staging
+  environment: production
 
