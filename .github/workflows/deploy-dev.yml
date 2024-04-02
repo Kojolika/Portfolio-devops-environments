@@ -2,7 +2,7 @@ name: Deploy App to Dev Server
 
 on:
   push:
-    paths: ['envs/testing/settings.yml']
+    paths: ['envs/testing/settings.yml', 'envs/testing/deployment.yml']
   repository_dispatch:
     types: [pr-merged-to-main]
 
@@ -10,8 +10,52 @@ permissions:
   contents: write
 
 jobs:
+  Get-EC2-IP:
+    runs-on: ubuntu-latest
+
+    outputs:
+      ec2-ip: ${{ steps.get-ip.outputs.EC2_IP }}
+
+    # This is required for requesting the JWT from AWS
+    permissions:
+      id-token: write 
+
+    env:
+      DEV_SETTINGS_FOLDER: "envs/testing"
+
+    steps:
+      - name: setup yq
+        uses: mikefarah/yq@master
+
+      - name: checkout repo
+        uses: actions/checkout@v4
+
+      - name: get aws region
+        run: |
+          cd $DEV_SETTINGS_FOLDER
+          AWS_ZONE=$(yq '.app.aws-zone' deployment.yml)
+          echo "AWS_ZONE=$AWS_ZONE" >> "$GITHUB_ENV"
+    
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_ZONE }}
+          role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
+
+      - name: get ec2 ip
+        id: get-ip
+        run: |
+          EC2_IP=$(aws --region "$AWS_ZONE" \
+          ec2 describe-instances --filters \
+          "Name=instance-state-name, Values=running" \
+          "Name=instance-id, Values=${{ secrets.EC2_INSTANCE_ID_DEV }}" \
+          --query "Reservations[*].Instances[*].[PublicIpAddress]" \
+          --output text)
+          echo "EC2_IP=$EC2_IP" >> "$GITHUB_OUTPUT"
+
   EC2-Deploy:
     runs-on: ubuntu-latest
+    needs: Get-EC2-IP
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
     # Then make sure the docker daemon is running
@@ -27,7 +71,7 @@ jobs:
       ENV_CONFIG_FILE: settings.yml
       APP_REPO_CHECKOUT_PATH: app
       EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
-      EC2_IP: ${{ secrets.EC2_IP_DEV }}
+      EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
@@ -77,10 +121,15 @@ jobs:
             echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
           fi
       
-      - id: version-outputs
+      - name: add version and build to job outputs
+        id: version-outputs
         run: |
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "BUILD=$BUILD" >> "$GITHUB_OUTPUT"
+      
+      - name: hide EC2 ip
+        run: |
+          echo "::add-mask::$EC2_IP"
 
       - name: set ssh identity on github runner
         run: |
@@ -155,17 +204,22 @@ jobs:
         run: |
           CURRENT_VERSION=$(yq '.app-version' ${{ env.VERSION_CONFIG }})
           CURRENT_BUILD=$(yq '.build' ${{ env.VERSION_CONFIG }})
+          HAS_FILE_BEEN_UPDATED="false"
           if [[ ! "$CURRENT_VERSION" = "$VERSION" ]]; then
             version=$VERSION yq -i '.app-version = env(version)' ${{ env.VERSION_CONFIG }}
+            HAS_FILE_BEEN_UPDATED="true"
           fi
           if [[ ! $CURRENT_BUILD -eq $BUILD ]]; then
             build=$BUILD yq -i '.build = env(build)' ${{ env.VERSION_CONFIG }}
+            HAS_FILE_BEEN_UPDATED="true"
           fi
-          git config --global user.email ${{ secrets.ACTIONS_COMMIT_EMAIL}}
-          git config --global user.name ${{ secrets.ACTIONS_COMMIT_NAME }}
-          git add ${{ env.VERSION_CONFIG }}
-          git commit -m "Set version according to image via Github Actions"
-          git push origin $GITHUB_REF_NAME
+          if [[ "$HAS_FILE_BEEN_UPDATED" = "true" ]]; then
+            git config --global user.email ${{ secrets.ACTIONS_COMMIT_EMAIL}}
+            git config --global user.name ${{ secrets.ACTIONS_COMMIT_NAME }}
+            git add ${{ env.VERSION_CONFIG }}
+            git commit -m "Set version according to image via Github Actions"
+            git push origin $GITHUB_REF_NAME
+          fi
 
         env:
           BUILD: ${{ needs.EC2-Deploy.outputs.build }}

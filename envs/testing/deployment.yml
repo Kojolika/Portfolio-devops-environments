@@ -1,6 +1,6 @@
-containers:
-  - name: dev
-    target_dir: /app
-    subdomain: dev
-    ec2-zone: us-east-2
-    environment: development
+app:
+  name: dev
+  target_dir: /app
+  subdomain: dev
+  aws-zone: us-east-2
+  environment: development
