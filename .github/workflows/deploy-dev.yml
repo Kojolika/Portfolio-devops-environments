@@ -47,7 +47,7 @@ jobs:
         run: |
           EC2_IP=$(aws --region "$AWS_ZONE" \
           ec2 describe-instances --filters \
-          "Name=instance-state, Values=running" \
+          "Name=instance-state-name, Values=running" \
           "Name=instance-id, Values=${{ secrets.EC2_INSTANCE_ID_DEV }}" \
           --query "Reservations[*].Instances[*].[PublicIpAddress]" \
           --output text)
