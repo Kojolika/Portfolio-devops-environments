@@ -41,7 +41,6 @@ jobs:
         with:
           aws-region: ${{ env.AWS_ZONE }}
           role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
-          role-session-name: Test
 
       - name: get ec2 ip
         id: get-ip
