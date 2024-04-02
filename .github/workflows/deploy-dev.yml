@@ -16,6 +16,10 @@ jobs:
     outputs:
       ec2-ip: ${{ steps.get-ip.outputs.EC2_IP }}
 
+    # This is required for requesting the JWT from AWS
+    permissions:
+      id-token: write 
+
     env:
       DEV_SETTINGS_FOLDER: "envs/testing"
 
@@ -31,15 +35,19 @@ jobs:
           cd $DEV_SETTINGS_FOLDER
           AWS_ZONE=$(yq '.app.aws-zone' deployment.yml)
           echo "AWS_ZONE=$AWS_ZONE" >> "$GITHUB_ENV"
-
-      - id: install-aws-cli
-        uses: unfor19/install-aws-cli-action@v1
+    
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: $AWS_ZONE
+          role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
+          role-session-name: Test
 
       - name: get ec2 ip
         id: get-ip
         run: |
           EC2_IP=$(aws --region "$AWS_ZONE" \
-          ec2 describe-instances --filters \
+          ec2 describe-instances --filters \op
           "Name=instance-state-id, Values=running" \
           "Name=instance-id, Values=${{ secrets.EC2_INSTANCE_ID_DEV }}" \
           --query "Reservations[*].Instances[*].[PublicIpAddress]" \
