@@ -108,6 +108,9 @@ jobs:
       - name: create rsa key
         if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
         run: |
+          if [ -d $KEY_DIRECTORY ]; then
+            mkdir -p $KEY_DIRECTORY
+          fi
           cd $KEY_DIRECTORY
           sudo openssl genrsa -aes128 -passout pass:$TLS_KEY_PASS_DEV -out $KEY_NAME 4096
           sudo chown root:root $KEY_NAME
