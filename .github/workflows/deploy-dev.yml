@@ -81,10 +81,93 @@ jobs:
           --query "Reservations[*].Instances[*].[PublicIpAddress]" \
           --output text)
           echo "EC2_IP=$EC2_IP" >> "$GITHUB_OUTPUT"
+
+  Check-HTTPS:
+    runs-on: ubuntu-latest
+    needs: Get-Domain
+
+    env:
+      KEY_DIRECTORY: /etc/pki/tls/private/
+      KEY_NAME: server.key
+      CRS_NAME: csr.pem
+
+    steps:
+      - name: check if https is enabled
+        id: https-check
+        run: |
+          if [ -f "${KEY_DIRECTORY}${KEY_NAME}" ]; then 
+            HTTPS_ENABLED="true"
+          else
+            HTTPS_ENABLED="false"
+          fi
+          echo "HTTPS_ENABLED=$HTTPS_ENABLED" >> "$GITHUB_OUTPUT"
+        
+        env:
+          EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
+
+      - name: create rsa key
+        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
+        run: |
+          cd $KEY_DIRECTORY
+          sudo openssl genrsa -aes128 -passout pass:$TLS_KEY_PASS_DEV -out $KEY_NAME 4096
+          sudo chown root:root $KEY_NAME
+          sudo chmod 600 $KEY_NAME
+          sudo openssl req -new -key $KEY_NAME -out $CRS_NAME -subj "/C=CA/ST=Ontario/L=Toronto/O=NA/OU=NA/CN=$DOMAIN_NAME"
+        
+        env:
+          TLS_KEY_PASS_DEV: ${{ secrets.TLS_KEY_PASS_DEV }}
+          DOMAIN_NAME: ${{ needs.Get-Domain.outputs.domain }}
+
+      - name: setup ssh connection to ec2
+        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
+        run: |
+          SSH_DIR=~/.ssh
+          mkdir -p $SSH_DIR
+          chmod 700 $SSH_DIR
+          cd $SSH_DIR
+          ssh-keyscan $EC2_IP > known_hosts
+          echo "$SSH_KEY" > $SSH_PRIVATE_KEY_FILE
+          chmod 600 *
+          eval `ssh-agent -s`
+          ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
+
+        env:
+          EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
+          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          SSH_PRIVATE_KEY_FILE: id_rsa
+      
+      - name: setup yq
+        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }} 
+        uses: mikefarah/yq@master
+
+      - name: checkout repo
+        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
+        uses: actions/checkout@v4
+      
+      - name: setup https
+        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
+        run: |
+          ssh ${EC2_USERNAME}@${EC2_IP}
+          curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl ; chmod 700 getssl
+          ./getssl -c $DOMAIN_NAME
+          sed -i -E 's/#ACCOUNT_EMAIL="[^"]*"/ACCOUNT_EMAIL="${DOMAIN_EMAIL}"/' .getssl/getssl.cfg
+          ENVIRONMENT=$(yq '.app.environment' /envs/testing/deployment.yml)
+          if[[ "$ENVIRONMENT" = "production" ]]; then
+            sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' .getssl/getssl.cfg
+            sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' .getssl/getssl.cfg
+          fi
+          sed -i -E 's/#DOMAIN_PEM_LOCATION="[^"]*"/DOMAIN_PEM_LOCATION="${KEY_DIRECTORY}${CRS_NAME}"/' .getssl/getssl.cfg
+          getssl $DOMAIN_NAME
+
+        env:
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV  }}
+          EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
+          DOMAIN_NAME: ${{ needs.Get-Domain.outputs.domain }}
+          DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
     
   EC2-Deploy:
     runs-on: ubuntu-latest
-    needs: [Get-EC2-IP, Get-Domain]
+    needs: [Get-EC2-IP, Get-Domain, Check-HTTPS]
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
     # Then make sure the docker daemon is running
@@ -211,89 +294,6 @@ jobs:
           if(( NUM_CONTAINERS < 2 )); then
             exit 1;
           fi
-  
-  Check-HTTPS:
-    runs-on: ubuntu-latest
-    needs: [EC2-Deploy, Get-Domain]
-
-    env:
-      KEY_DIRECTORY: "/etc/pki/tls/private/"
-      KEY_NAME: server.key
-      CRS_NAME: csr.pem
-
-    steps:
-      - name: check if https is enabled
-        id: https-check
-        run: |
-          if wget --spider https://${EC2_IP} 2> /dev/null; then 
-            HTTPS_ENABLED="true"
-          else
-            HTTPS_ENABLED="false"
-          fi
-          echo "HTTPS_ENABLED=$HTTPS_ENABLED" >> "$GITHUB_OUTPUT"
-        
-        env:
-          EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
-
-      - name: create rsa key
-        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
-        run: |
-          cd $KEY_DIRECTORY
-          sudo openssl genrsa -aes128 -passout pass:$TLS_KEY_PASS_DEV -out $KEY_NAME 4096
-          sudo chown root:root $KEY_NAME
-          sudo chmod 600 $KEY_NAME
-          sudo openssl req -new -key $KEY_NAME -out $CRS_NAME -subj "/C=CA/ST=Ontario/L=Toronto/O=NA/OU=NA/CN=$DOMAIN_NAME"
-        
-        env:
-          TLS_KEY_PASS_DEV: ${{ secrets.TLS_KEY_PASS_DEV }}
-          DOMAIN_NAME: ${{ needs.Get-Domain.outputs.domain }}
-
-      - name: setup ssh connection to ec2
-        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
-        run: |
-          SSH_DIR=~/.ssh
-          mkdir -p $SSH_DIR
-          chmod 700 $SSH_DIR
-          cd $SSH_DIR
-          ssh-keyscan $EC2_IP > known_hosts
-          echo "$SSH_KEY" > $SSH_PRIVATE_KEY_FILE
-          chmod 600 *
-          eval `ssh-agent -s`
-          ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
-
-        env:
-          EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
-          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-          SSH_PRIVATE_KEY_FILE: id_rsa
-      
-      - name: setup yq
-        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }} 
-        uses: mikefarah/yq@master
-
-      - name: checkout repo
-        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
-        uses: actions/checkout@v4
-      
-      - name: setup https
-        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
-        run: |
-          ssh ${EC2_USERNAME}@${EC2_IP}
-          curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl ; chmod 700 getssl
-          ./getssl -c $DOMAIN_NAME
-          sed -i -E 's/#ACCOUNT_EMAIL="[^"]*"/ACCOUNT_EMAIL="${DOMAIN_EMAIL}"/' .getssl/getssl.cfg
-          ENVIRONMENT=$(yq '.app.environment' /envs/testing/deployment.yml)
-          if[[ "$ENVIRONMENT" = "production" ]]; then
-            sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' .getssl/getssl.cfg
-            sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' .getssl/getssl.cfg
-          fi
-          sed -i -E 's/#DOMAIN_PEM_LOCATION="[^"]*"/DOMAIN_PEM_LOCATION="${KEY_DIRECTORY}${CRS_NAME}"/' .getssl/getssl.cfg
-          getssl $DOMAIN_NAME
-
-        env:
-          EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV  }}
-          EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
-          DOMAIN_NAME: ${{ needs.Get-Domain.outputs.domain }}
-          DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
 
   Set-Version-In-Repo:
     runs-on: ubuntu-latest
