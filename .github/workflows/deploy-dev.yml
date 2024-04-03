@@ -115,7 +115,7 @@ jobs:
           sudo openssl genrsa -aes128 -passout pass:$TLS_KEY_PASS_DEV -out $KEY_NAME 4096
           sudo chown root:root $KEY_NAME
           sudo chmod 600 $KEY_NAME
-          sudo openssl req -new -key $KEY_NAME -out $CRS_NAME -subj "/C=CA/ST=Ontario/L=Toronto/O=NA/OU=NA/CN=$DOMAIN_NAME"
+          sudo openssl req -new -key $KEY_NAME -passin pass:$TLS_KEY_PASS_DEV -out $CRS_NAME -subj "/C=CA/ST=Ontario/L=Toronto/O=NA/OU=NA/CN=$DOMAIN_NAME"
         
         env:
           TLS_KEY_PASS_DEV: ${{ secrets.TLS_KEY_PASS_DEV }}
