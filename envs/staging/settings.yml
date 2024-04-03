@@ -7,5 +7,5 @@ components:
 
 
 specifics:
-  deployment: envs/staging/deployment.yml
-  version: envs/staging/version.yml
+  deployment: deployment.yml
+  version: version.yml
