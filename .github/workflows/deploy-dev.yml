@@ -108,7 +108,7 @@ jobs:
       - name: create rsa key
         if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
         run: |
-          if [ -d $KEY_DIRECTORY ]; then
+          if [ ! -d $KEY_DIRECTORY ]; then
             mkdir -p $KEY_DIRECTORY
           fi
           cd $KEY_DIRECTORY
