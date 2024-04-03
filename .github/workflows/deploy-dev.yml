@@ -276,7 +276,7 @@ jobs:
           EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV  }}
           EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
           DOMAIN_NAME: ${{ steps.domain-name.outputs.name }}
-          DOMAIN_EMAIL: ${{ secerts.DOMAIN_EMAIL }}
+          DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
 
   Set-Version-In-Repo:
     runs-on: ubuntu-latest
