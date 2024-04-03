@@ -32,10 +32,10 @@ jobs:
             SUB_DOMAIN="$SUB_DOMAIN."
           fi
           echo "name=${SUB_DOMAIN}${BASE_DOMAIN}" >> "$GITHUB_OUTPUT"
-          
+
         env:
-          BASE_SETTINGS_FILE: /base/settings.yml
-          ENV_SETTINGS_FILE: /envs/testing/settings.yml
+          BASE_SETTINGS_FILE: base/settings.yml
+          ENV_SETTINGS_FILE: envs/testing/settings.yml
 
   Get-EC2-IP:
     runs-on: ubuntu-latest
