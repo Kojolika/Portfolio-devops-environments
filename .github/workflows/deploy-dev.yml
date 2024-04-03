@@ -94,8 +94,7 @@ jobs:
       version: ${{ steps.version-outputs.outputs.VERSION }}
 
     env:
-      ENV_CONFIG_PATH: envs/testing/
-      ENV_CONFIG_FILE: settings.yml
+      ENV_CONFIG_FILE: envs/testing/settings.yml
       APP_REPO_CHECKOUT_PATH: app
       EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
       EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
@@ -118,14 +117,12 @@ jobs:
 
       - name: get port and protocol settings
         run: |
-          cd $ENV_CONFIG_PATH
           echo -n "PORT=" >> "$GITHUB_ENV" && yq 'load(.resources[0]) | .deployment.ports.port' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
           echo -n "AWS_ZONE=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .app.aws-zone' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
           echo -n "NODE_ENV=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .app.environment' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
 
       - name: get build and verison number
         run: |
-          cd $ENV_CONFIG_PATH
           IMAGE=$(yq 'load(.specifics.version) | .spec.containers[] | select(.app-name == "portfolio") | .image' $ENV_CONFIG_FILE)
           echo -n "IMAGE=" >> "$GITHUB_ENV" && echo "$IMAGE" >> "$GITHUB_ENV"
           if [[ -z $(echo "$IMAGE" | grep -P -o "[0-9]+\.[0-9]+\.[0-9]+\-[0-9]+") ]]; then
