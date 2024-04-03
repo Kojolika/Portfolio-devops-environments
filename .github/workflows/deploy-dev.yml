@@ -163,7 +163,7 @@ jobs:
           curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl ; chmod 700 getssl
           ./getssl -c $DOMAIN_NAME
           sed -i -E 's/#ACCOUNT_EMAIL="[^"]*"/ACCOUNT_EMAIL="${DOMAIN_EMAIL}"/' ~/.getssl/getssl.cfg
-          if[[ "$ENVIRONMENT" = "production" ]]; then
+          if [[ "$ENVIRONMENT" = "production" ]]; then
             sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
             sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
           fi
