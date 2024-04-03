@@ -28,7 +28,7 @@ jobs:
         run: |
           BASE_DOMAIN=$(yq '.deployment.domain' $BASE_SETTINGS_FILE)
           SUB_DOMAIN=$(yq '.specifics | load(.deployment) | .app.subdomain' $ENV_SETTINGS_FILE)
-          if [[ ! $SUB_DOMAIN -z ]]; then
+          if [[ ! -z $SUB_DOMAIN ]]; then
             SUB_DOMAIN="$SUB_DOMAIN."
           fi
           echo "name=${SUB_DOMAIN}${BASE_DOMAIN}" >> "$GITHUB_OUTPUT"
