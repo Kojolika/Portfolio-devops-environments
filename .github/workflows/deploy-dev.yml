@@ -10,6 +10,29 @@ permissions:
   contents: write
 
 jobs:
+  Get-Domain:
+    runs-on: ubuntu-latest
+
+    outputs:
+      domain: ${{ steps.domain-name.outputs.name }}
+
+    steps:
+      - name: setup yq
+        uses: mikefarah/yq@master
+
+      - name: checkout repo
+        uses: actions/checkout@v4
+
+      - name: grab domain name
+        id: domain-name
+        run: |
+          BASE_DOMAIN=$(yq '.deployment.domain' $BASE_SETTINGS_FILE)
+          SUB_DOMAIN=$(yq '.specifics | load(.deployment) | .app.subdomain' $ENV_SETTINGS_FILE)
+          if [[ ! $SUB_DOMAIN -z ]]; then
+            SUB_DOMAIN="$SUB_DOMAIN."
+          fi
+          echo "name=${SUB_DOMAIN}${BASE_DOMAIN}" >> "$GITHUB_OUTPUT"
+
   Get-EC2-IP:
     runs-on: ubuntu-latest
 
@@ -55,7 +78,7 @@ jobs:
     
   EC2-Deploy:
     runs-on: ubuntu-latest
-    needs: Get-EC2-IP
+    needs: [Get-EC2-IP, Get-Domain]
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
     # Then make sure the docker daemon is running
@@ -156,9 +179,11 @@ jobs:
           echo "AWS_ZONE=$AWS_ZONE" >> .env
           echo "BUILD=${VERSION}+${BUILD}" >> .env
           echo "LATEST_IMAGE=${DOCKER_REPO}:${IMAGE}" >> .env
+          echo "DOMAIN=${DOMAIN}" >> .env
           
         env:
           DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
+          DOMAIN: ${{ needs.Get-Domain.outputs.domain }}
  
       - name: run commands on ec2 through ssh
         run: |
@@ -183,7 +208,7 @@ jobs:
   
   Check-HTTPS:
     runs-on: ubuntu-latest
-    needs: EC2-Deploy
+    needs: [EC2-Deploy, Get-Domain]
 
     env:
       KEY_DIRECTORY: "/etc/pki/tls/private/"
@@ -203,17 +228,6 @@ jobs:
         
         env:
           EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
-    
-      - name: grab domain name
-        if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
-        id: domain-name
-        run: |
-          BASE_DOMAIN=$(yq '.deployment.domain' $BASE_SETTINGS_FILE)
-          SUB_DOMAIN=$(yq '.specifics | load(.deployment) | .app.subdomain' $ENV_SETTINGS_FILE)
-          if [[ ! $SUB_DOMAIN -z ]]; then
-            SUB_DOMAIN="$SUB_DOMAIN."
-          fi
-          echo "name=${SUB_DOMAIN}${BASE_DOMAIN}" >> "$GITHUB_OUTPUT"
 
       - name: create rsa key
         if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
@@ -226,7 +240,7 @@ jobs:
         
         env:
           TLS_KEY_PASS_DEV: ${{ secrets.TLS_KEY_PASS_DEV }}
-          DOMAIN_NAME: ${{ steps.domain-name.outputs.name }}
+          DOMAIN_NAME: ${{ needs.Get-Domain.outputs.domain }}
 
       - name: setup ssh connection to ec2
         if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
@@ -271,11 +285,12 @@ jobs:
             sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' .getssl/getssl.cfg
           fi
           sed -i -E 's/#DOMAIN_PEM_LOCATION="[^"]*"/DOMAIN_PEM_LOCATION="${KEY_DIRECTORY}${CRS_NAME}"/' .getssl/getssl.cfg
+          getssl $DOMAIN_NAME
 
         env:
           EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV  }}
           EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
-          DOMAIN_NAME: ${{ steps.domain-name.outputs.name }}
+          DOMAIN_NAME: ${{ needs.Get-Domain.outputs.domain }}
           DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
 
   Set-Version-In-Repo:
