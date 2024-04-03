@@ -167,7 +167,7 @@ jobs:
             sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
             sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
           fi
-          sed -i -E 's/#DOMAIN_PEM_LOCATION="[^"]*"/DOMAIN_PEM_LOCATION="${KEY_DIRECTORY}${CRS_NAME}"/' ~/.getssl/getssl.cfg
+          sed -i -E 's/#DOMAIN_PEM_LOCATION="[^"]*"/DOMAIN_PEM_LOCATION=""/' ~/.getssl/$DOMAIN_NAME/getssl.cfg
           getssl $DOMAIN_NAME
 
         env:
