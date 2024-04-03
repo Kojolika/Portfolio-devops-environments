@@ -10,11 +10,17 @@ permissions:
   contents: write
 
 jobs:
-  Get-Domain:
+  Get-Env-Variables-From-Repo:
     runs-on: ubuntu-latest
 
     outputs:
       domain: ${{ steps.domain-name.outputs.name }}
+      environment: ${{ steps.env-name.outputs.environment }}
+
+    env:
+      BASE_SETTINGS_FILE: ./base/settings.yml
+      ENV_SETTINGS_FILE: settings.yml
+      DEV_SETTINGS_FOLDER: envs/testing
 
     steps:
       - name: setup yq
@@ -34,10 +40,11 @@ jobs:
           fi
           echo "name=${SUB_DOMAIN}${BASE_DOMAIN}" >> "$GITHUB_OUTPUT"
 
-        env:
-          BASE_SETTINGS_FILE: ./base/settings.yml
-          ENV_SETTINGS_FILE: settings.yml
-          DEV_SETTINGS_FOLDER: envs/testing
+      - name: grab env
+        id: env-name
+        run: |
+          ENVIRONMENT=$(yq '.specifics | load(.deployment) | .app.environment' "${DEV_SETTINGS_FOLDER}/${ENV_SETTINGS_FILE}")
+          echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
 
   Get-EC2-IP:
     runs-on: ubuntu-latest
@@ -84,7 +91,7 @@ jobs:
 
   Check-HTTPS:
     runs-on: ubuntu-latest
-    needs: [Get-Domain, Get-EC2-IP]
+    needs: [Get-Env-Variables-From-Repo, Get-EC2-IP]
 
     env:
       KEY_DIRECTORY: /etc/pki/tls/private/
@@ -119,7 +126,7 @@ jobs:
         
         env:
           TLS_KEY_PASS_DEV: ${{ secrets.TLS_KEY_PASS_DEV }}
-          DOMAIN_NAME: ${{ needs.Get-Domain.outputs.domain }}
+          DOMAIN_NAME: ${{ needs.Get-Env-Variables-From-Repo.outputs.domain }}
 
       - name: setup ssh connection to ec2
         if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
@@ -151,26 +158,27 @@ jobs:
         if: ${{ steps.https-check.outputs.HTTPS_ENABLED == 'false' }}
         run: |
           ssh ${EC2_USERNAME}@${EC2_IP}
+          cd ~
           curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl ; chmod 700 getssl
           ./getssl -c $DOMAIN_NAME
-          sed -i -E 's/#ACCOUNT_EMAIL="[^"]*"/ACCOUNT_EMAIL="${DOMAIN_EMAIL}"/' .getssl/getssl.cfg
-          ENVIRONMENT=$(yq '.app.environment' /envs/testing/deployment.yml)
+          sed -i -E 's/#ACCOUNT_EMAIL="[^"]*"/ACCOUNT_EMAIL="${DOMAIN_EMAIL}"/' ~/.getssl/getssl.cfg
           if[[ "$ENVIRONMENT" = "production" ]]; then
-            sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' .getssl/getssl.cfg
-            sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' .getssl/getssl.cfg
+            sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
+            sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
           fi
-          sed -i -E 's/#DOMAIN_PEM_LOCATION="[^"]*"/DOMAIN_PEM_LOCATION="${KEY_DIRECTORY}${CRS_NAME}"/' .getssl/getssl.cfg
+          sed -i -E 's/#DOMAIN_PEM_LOCATION="[^"]*"/DOMAIN_PEM_LOCATION="${KEY_DIRECTORY}${CRS_NAME}"/' ~/.getssl/getssl.cfg
           getssl $DOMAIN_NAME
 
         env:
           EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV  }}
           EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
-          DOMAIN_NAME: ${{ needs.Get-Domain.outputs.domain }}
+          DOMAIN_NAME: ${{ needs.Get-Env-Variables-From-Repo.outputs.domain }}
           DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
+          ENVIRONMENT: ${{ needs.Get-Env-Variables-From-Repo.outputs.environment }}
     
   EC2-Deploy:
     runs-on: ubuntu-latest
-    needs: [Get-EC2-IP, Get-Domain, Check-HTTPS]
+    needs: [Get-EC2-IP, Get-Env-Variables-From-Repo, Check-HTTPS]
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
     # Then make sure the docker daemon is running
@@ -209,7 +217,6 @@ jobs:
           cd $ENV_CONFIG_PATH
           echo -n "PORT=" >> "$GITHUB_ENV" && yq 'load(.resources[0]) | .deployment.ports.port' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
           echo -n "AWS_ZONE=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .app.aws-zone' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
-          echo -n "NODE_ENV=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .app.environment' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
 
       - name: get build and verison number
         run: |
@@ -266,7 +273,7 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           cd $APP_REPO_CHECKOUT_PATH
-          echo "NODE_ENV=$NODE_ENV" >> .env
+          echo "NODE_ENV=$ENVIRONMENT" >> .env
           echo "PORT=$PORT" >> .env
           echo "AWS_ZONE=$AWS_ZONE" >> .env
           echo "BUILD=${VERSION}+${BUILD}" >> .env
@@ -275,7 +282,8 @@ jobs:
           
         env:
           DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
-          DOMAIN: ${{ needs.Get-Domain.outputs.domain }}
+          DOMAIN: ${{ needs.Get-Env-Variables-From-Repo.outputs.domain }}
+          ENVIRONMENT: ${{ needs.Get-Env-Variables-From-Repo.outputs.environment }}
  
       - name: run commands on ec2 through ssh
         run: |
