@@ -53,6 +53,24 @@ jobs:
           --output text)
           echo "EC2_IP=$EC2_IP" >> "$GITHUB_OUTPUT"
 
+  Check-HTTPS:
+    runs-on: ubuntu-latest
+    needs: Get-EC2-IP
+
+    steps:
+      - name: check if https is enabled
+        run: |
+          if wget --spider https://${EC2_IP} 2> /dev/null; then 
+            HTTPS_ENABLED="true"
+          else 
+            HTTPS_ENABLED="false"
+          fi
+          echo "HTTPS_ENABLED=$HTTPS_ENABLED" >> "$GITHUB_ENV"
+        
+        env:
+          EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
+    
+
   EC2-Deploy:
     runs-on: ubuntu-latest
     needs: Get-EC2-IP
