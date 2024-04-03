@@ -43,7 +43,8 @@ jobs:
       - name: grab env
         id: env-name
         run: |
-          ENVIRONMENT=$(yq '.specifics | load(.deployment) | .app.environment' "${DEV_SETTINGS_FOLDER}/${ENV_SETTINGS_FILE}")
+          cd $DEV_SETTINGS_FOLDER
+          ENVIRONMENT=$(yq '.specifics | load(.deployment) | .app.environment' $ENV_SETTINGS_FILE)
           echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
 
   Get-EC2-IP:
