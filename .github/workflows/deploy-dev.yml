@@ -84,7 +84,7 @@ jobs:
 
   Check-HTTPS:
     runs-on: ubuntu-latest
-    needs: Get-Domain
+    needs: [Get-Domain, Get-EC2-IP]
 
     env:
       KEY_DIRECTORY: /etc/pki/tls/private/
