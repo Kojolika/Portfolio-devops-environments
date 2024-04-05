@@ -162,14 +162,13 @@ jobs:
           cd ~
           curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl ; chmod 700 getssl
           ./getssl -c $DOMAIN_NAME
-          sed -i -E 's/#ACCOUNT_EMAIL="[^"]*"/ACCOUNT_EMAIL="${DOMAIN_EMAIL}"/' ~/.getssl/getssl.cfg
+          sed -i -E "s/#ACCOUNT_EMAIL="[^"]*"/ACCOUNT_EMAIL="${DOMAIN_EMAIL}"/" ~/.getssl/getssl.cfg
           if [[ "$ENVIRONMENT" = "production" ]]; then
             sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
             sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
           fi
-          sed -i -E 's/#DOMAIN_PEM_LOCATION="[^"]*"/DOMAIN_PEM_LOCATION=""/' ~/.getssl/$DOMAIN_NAME/getssl.cfg
-          sed -i -E 's/#ACL=([^)]*)/ACL=(\'/var/www/${DOMAIN_NAME}/web/.well-known/acme-challenge\')' ~/.getssl/$DOMAIN_NAME/getssl.cfg
-          sed -i -E 's/#USE_SINGLE_ACL=[^"]*"/USE_SINGLE_ACL="true"/' ~/.getssl/$DOMAIN_NAME/getssl.cfg
+          sed -i -E "s/#ACL=\([^\)]*\)/ACL=(\"\/var\/www\/${DOMAIN_NAME}\/web\/.well-known\/acme-challenge\")/" ~/.getssl/$DOMAIN_NAME/getssl.cfg
+          sed -i -E 's/#USE_SINGLE_ACL="[^"]"*"/USE_SINGLE_ACL="true"/' ~/.getssl/$DOMAIN_NAME/getssl.cfg
           ./getssl $DOMAIN_NAME
 
         env:
