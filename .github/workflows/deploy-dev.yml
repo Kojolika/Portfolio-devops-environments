@@ -92,7 +92,7 @@ jobs:
     
   EC2-Deploy:
     runs-on: ubuntu-latest
-    needs: [Get-EC2-IP, Get-Env-Variables-From-Repo, Check-HTTPS]
+    needs: [Get-EC2-IP, Get-Env-Variables-From-Repo]
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
     # Then make sure the docker daemon is running
