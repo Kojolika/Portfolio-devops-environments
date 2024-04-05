@@ -106,7 +106,7 @@ jobs:
           if [ -f "${KEY_DIRECTORY}${KEY_NAME}" ]; then 
             HTTPS_ENABLED="true"
           else
-            HTTPS_ENABLED="false"
+            HTTPS_ENABLED="true"
           fi
           echo "HTTPS_ENABLED=$HTTPS_ENABLED" >> "$GITHUB_OUTPUT"
         
@@ -160,14 +160,12 @@ jobs:
         run: |
           ssh ${EC2_USERNAME}@${EC2_IP}
           cd ~
-
           if [ -d .getssl ]; then
             rm -r .getssl
           fi
           if [ -f getssl ]; then
             rm getssl
           fi
-
           curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl ; chmod 700 getssl
           ./getssl -c $DOMAIN_NAME
           sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=${DOMAIN_EMAIL}/" ~/.getssl/getssl.cfg
