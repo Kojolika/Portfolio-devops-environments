@@ -4,3 +4,8 @@ deployment:
   ports:
     port: 8080
     protocol: tcp
+  ssl:
+    directories:
+      cert: /etc/nginx/certificates/
+      key: /etc/nginx/private/
+      acme-challenge: /var/www/${DOMAIN}/.well-known/acme-challenge/

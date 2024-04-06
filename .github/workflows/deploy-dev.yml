@@ -187,24 +187,28 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           cd $APP_REPO_CHECKOUT_PATH
+          echo "ENVIRONMENT=$ENVIRONMENT" >> .env
           echo "NODE_ENV=$ENVIRONMENT" >> .env
           echo "PORT=$PORT" >> .env
           echo "AWS_ZONE=$AWS_ZONE" >> .env
           echo "BUILD=${VERSION}+${BUILD}" >> .env
           echo "LATEST_IMAGE=${DOCKER_REPO}:${IMAGE}" >> .env
           echo "DOMAIN=${DOMAIN}" >> .env
-          
+          echo "DOMAIN_EMAIL=${DOMAIN_EMAIL}" >> .env
+          echo "SSL_CERT_DIRECTORY=/etc/nginx/certificates/" >> .env
+          echo "SSL_KEY_DIRECTORY=/etc/nginx/private/" >> .env
+          echo "ACL=/var/www/${DOMAIN}/.well-known/acme-challenge/" >> .env
+        # TODO: get from env repo
+        
         env:
           DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
           DOMAIN: ${{ needs.Get-Env-Variables-From-Repo.outputs.domain }}
           ENVIRONMENT: ${{ needs.Get-Env-Variables-From-Repo.outputs.environment }}
+          DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
  
       - name: run commands on ec2 through ssh
         run: |
           cd $APP_REPO_CHECKOUT_PATH
-          mkdir tls_keys
-          touch tls_keys/$DOMAIN.key
-          touch tls_keys/$DOMAIN.crt
           docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
           docker context use $EC2_CONTEXT
           echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin
@@ -302,14 +306,14 @@ jobs:
           fi
           curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl ; chmod 700 getssl
           ./getssl -c $DOMAIN_NAME
-          sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=${DOMAIN_EMAIL}/" ~/.getssl/getssl.cfg
+          sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=${DOMAIN_EMAIL}/" .getssl/getssl.cfg
           if [[ "$ENVIRONMENT" = "production" ]]; then
-            sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
-            sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' ~/.getssl/getssl.cfg
+            sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' .getssl/getssl.cfg
+            sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' .getssl/getssl.cfg
           fi
-          sed -i -E "s/#ACL=\(.*/ACL=(\"\/var\/www\/${DOMAIN_NAME}\/web\/.well-known\/acme-challenge\")/" ~/.getssl/$DOMAIN_NAME/getssl.cfg
-          sed -i -E 's/#USE_SINGLE_ACL="[^"]*"/USE_SINGLE_ACL="true"/' ~/.getssl/$DOMAIN_NAME/getssl.cfg
-          sed -i -E "s/\"www\.${DOMAIN_NAME}\"//" ~/.getssl/$DOMAIN_NAME/getssl.cfg
+          sed -i -E "s/#ACL=\(.*/ACL=(\"\/var\/www\/${DOMAIN_NAME}\/web\/.well-known\/acme-challenge\")/" .getssl/$DOMAIN_NAME/getssl.cfg
+          sed -i -E 's/#USE_SINGLE_ACL="[^"]*"/USE_SINGLE_ACL="true"/' .getssl/$DOMAIN_NAME/getssl.cfg
+          sed -i -E "s/\"www\.${DOMAIN_NAME}\"//" .getssl/$DOMAIN_NAME/getssl.cfg
           sudo ./getssl $DOMAIN_NAME
 
         env:
