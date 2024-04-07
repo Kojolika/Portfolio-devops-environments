@@ -104,6 +104,7 @@ jobs:
 
     env:
         EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
+        EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
 
     steps:
       - name: set ssh identity on github runner
@@ -124,7 +125,6 @@ jobs:
       - name: check if cert exists already
         id: check-cert
         env:
-          EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
           DOMAIN: ${{ needs.Get-Env-Variables-From-Repo.outputs.domain }}
           SSL_CERT_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_cert_directory }}
         run: |
