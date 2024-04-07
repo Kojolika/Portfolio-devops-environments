@@ -139,7 +139,7 @@ jobs:
             echo "CERT_EXISTS=$CERT_EXISTS" >> "$GITHUB_OUTPUT"
   
       - name: use getssl to generate and sign certificates
-        if: ${{ steps.check-cert.outputs.CERT_EXISTS == "false" }}
+        if: ${{ steps.check-cert.outputs.CERT_EXISTS == false }}
         env:
           DOMAIN: ${{ needs.Get-Env-Variables-From-Repo.outputs.domain }}
           DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
