@@ -22,7 +22,6 @@ jobs:
 
     env:
       BASE_SETTINGS_FILE: ./base/settings.yml
-      BASE_SETTINGS_FOLDER: ./base
       ENV_SETTINGS_FILE: settings.yml
       DEV_SETTINGS_FOLDER: ./envs/testing
 
@@ -49,7 +48,6 @@ jobs:
       - name: output base env variables
         id: base-variables
         run: |
-          cd $BASE_SETTINGS_FOLDER
           CERT_DIRECTORY=$(yq '.deployment.ssl.directories.cert' $BASE_SETTINGS_FILE)
           KEY_DIRECTORY=$(yq '.deployment.ssl.directories.key' $BASE_SETTINGS_FILE)
           ACME_CHALLENGE_DIRECTORY=$(yq '.deployment.ssl.directories.acme-challenge' $BASE_SETTINGS_FILE)
