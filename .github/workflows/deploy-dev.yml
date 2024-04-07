@@ -152,8 +152,12 @@ jobs:
           SSL_CONFIG=~/.getssl/getssl.cfg
           SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
           cd ~
-          rm -r .getssl
-          rm getssl
+          if [ -d .getssl ]; then
+            rm -r .getssl
+          fi
+          if [ -f getssl ]; then
+            rm getssl
+          fi
           curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
           chmod 700 getssl
           ./getssl -c ${DOMAIN}
