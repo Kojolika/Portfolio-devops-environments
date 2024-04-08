@@ -90,45 +90,45 @@ jobs:
           --output text)
           echo "EC2_IP=$EC2_IP" >> "$GITHUB_OUTPUT"
 
-        - name: check https
-          env:
-            INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID_DEV }}
-            DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
-            DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
-            SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
-            SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
-            SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
-          run: |
-            aws ec2-instance-connect ssh --instance-id $INSTANCE_ID
-            if [[ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.cert ]]; then
-              sudo yum install dnsutils
-              set -x
-              SSL_CONFIG=~/.getssl/getssl.cfg
-              SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
-              cd ~
-              if [ -d .getssl ]; then
-              rm -r .getssl
-              fi
-              if [ -f getssl ]; then
-                rm getssl
-              fi
-              curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl; chmod 700 getssl
-              ./getssl -c ${DOMAIN}
-              sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=${DOMAIN_EMAIL}/" $SSL_CONFIG
-              if [[ "$ENVIRONMENT" = "production" ]]; then
-                sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
-                sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
-              fi
-              sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
-              SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY//\//\\\/}
-              SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY//\//\\\/}
-              sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sudo ./getssl ${DOMAIN}
+      - name: check https
+        env:
+          INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID_DEV }}
+          DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
+          DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
+          SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
+          SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
+          SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
+        run: |
+          aws ec2-instance-connect ssh --instance-id $INSTANCE_ID
+          if [[ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.cert ]]; then
+            sudo yum install dnsutils
+            set -x
+            SSL_CONFIG=~/.getssl/getssl.cfg
+            SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
+            cd ~
+            if [ -d .getssl ]; then
+            rm -r .getssl
             fi
+            if [ -f getssl ]; then
+              rm getssl
+            fi
+            curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl; chmod 700 getssl
+            ./getssl -c ${DOMAIN}
+            sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=${DOMAIN_EMAIL}/" $SSL_CONFIG
+            if [[ "$ENVIRONMENT" = "production" ]]; then
+              sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
+              sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
+            fi
+            sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
+            SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY//\//\\\/}
+            SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY//\//\\\/}
+            sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            sudo ./getssl ${DOMAIN}
+          fi
     
   EC2-Deploy:
     runs-on: ubuntu-latest
@@ -148,7 +148,7 @@ jobs:
       ENV_CONFIG_FILE: settings.yml
       APP_REPO_CHECKOUT_PATH: app
       EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
-    EC2_IP: ${{ needs.get_ip_and_check_https.outputs.ec2-ip }}
+      EC2_IP: ${{ needs.get_ip_and_check_https.outputs.ec2-ip }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
