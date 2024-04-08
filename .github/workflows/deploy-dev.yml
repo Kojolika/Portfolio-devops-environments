@@ -145,7 +145,7 @@ jobs:
           SSL_KEY_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_key_directory }}
           SSL_ACME_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_acme_directory }}
         run: |
-          ssh $EC2_USERNAME@$EC2_IP
+          ssh -T $EC2_USERNAME@$EC2_IP
           sudo apt-get update
           sudo apt-get install --assume-yes dnsutils
           set -x
