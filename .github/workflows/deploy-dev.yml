@@ -69,12 +69,11 @@ jobs:
     permissions:
       id-token: write 
 
-    env:
-      DEV_SETTINGS_FOLDER: "envs/testing"
-
     steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
+        env:
+          AWS_ZONE: ${{ needs.get_env_vars_from_repo.outputs.aws_zone }}
         with:
           aws-region: ${{ env.AWS_ZONE }}
           role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
