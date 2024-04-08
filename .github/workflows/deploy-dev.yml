@@ -10,12 +10,13 @@ permissions:
   contents: write
 
 jobs:
-  Get-Env-Variables-From-Repo:
+  get_env_vars_from_repo:
     runs-on: ubuntu-latest
 
     outputs:
       domain: ${{ steps.dev-specific-variables.outputs.domain }}
       environment: ${{ steps.dev-specific-variables.outputs.environment }}
+      aws_zone: ${{ steps.dev-specific-variables.outputs.aws_zone }}
       ssl_cert_directory: ${{ steps.base-variables.outputs.environment }}
       ssl_key_directory: ${{ steps.base-variables.outputs.environment }}
       ssl_acme_directory: ${{ steps.base-variables.outputs.environment }}
@@ -44,6 +45,8 @@ jobs:
           echo "domain=${SUB_DOMAIN}${BASE_DOMAIN}" >> "$GITHUB_OUTPUT"
           ENVIRONMENT=$(yq '.specifics | load(.deployment) | .app.environment' $ENV_SETTINGS_FILE)
           echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
+          AWS_ZONE=$(yq '.app.aws-zone' deployment.yml)
+          echo "aws_zone=$AWS_ZONE" >> "$GITHUB_OUTPUT"
 
       - name: output base env variables
         id: base-variables
@@ -55,8 +58,9 @@ jobs:
           echo "ssl_key_directory=$KEY_DIRECTORY" >> "$GITHUB_OUTPUT"
           echo "ssl_acme_directory=$ACME_CHALLENGE_DIRECTORY" >> "$GITHUB_OUTPUT"
 
-  Get-EC2-IP:
+  get_ip_and_check_https:
     runs-on: ubuntu-latest
+    needs: [get_env_vars_from_repo]
 
     outputs:
       ec2-ip: ${{ steps.get-ip.outputs.EC2_IP }}
@@ -69,18 +73,6 @@ jobs:
       DEV_SETTINGS_FOLDER: "envs/testing"
 
     steps:
-      - name: setup yq
-        uses: mikefarah/yq@master
-
-      - name: checkout repo
-        uses: actions/checkout@v4
-
-      - name: get aws region
-        run: |
-          cd $DEV_SETTINGS_FOLDER
-          AWS_ZONE=$(yq '.app.aws-zone' deployment.yml)
-          echo "AWS_ZONE=$AWS_ZONE" >> "$GITHUB_ENV"
-    
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -89,6 +81,8 @@ jobs:
 
       - name: get ec2 ip
         id: get-ip
+        env:
+          AWS_ZONE: ${{ needs.get_env_vars_from_repo.outputs.aws_zone}}
         run: |
           EC2_IP=$(aws --region "$AWS_ZONE" \
           ec2 describe-instances --filters \
@@ -98,86 +92,49 @@ jobs:
           --output text)
           echo "EC2_IP=$EC2_IP" >> "$GITHUB_OUTPUT"
 
-  Check-HTTPS:
-    runs-on: ubuntu-latest
-    needs: [Get-EC2-IP, Get-Env-Variables-From-Repo]
-
-    env:
-        EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
-        EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
-
-    steps:
-      - name: set ssh identity on github runner
-        env:
-          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-          SSH_PRIVATE_KEY_FILE: id_rsa
-        run: |
-          SSH_DIR=~/.ssh
-          mkdir -p $SSH_DIR
-          chmod 700 $SSH_DIR
-          cd $SSH_DIR
-          ssh-keyscan $EC2_IP > known_hosts
-          echo "$SSH_KEY" > $SSH_PRIVATE_KEY_FILE
-          chmod 600 *
-          eval `ssh-agent -s`
-          ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
-
-      - name: check if cert exists already
-        id: check-cert
-        env:
-          DOMAIN: ${{ needs.Get-Env-Variables-From-Repo.outputs.domain }}
-          SSL_CERT_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_cert_directory }}
-        run: |
-            ssh $EC2_USERNAME@$EC2_IP
-            if [[ -f ${DOMAIN}.cert ]]; then
-              CERT_EXISTS="true"
-            else
-              CERT_EXISTS="false"
+        - name: check https
+          env:
+            INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID_DEV }}
+            DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
+            DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
+            SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
+            SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
+            SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
+          run: |
+            aws ec2-instance-connect ssh --instance-id $INSTANCE_ID
+            if [[ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.cert ]]; then
+              sudo yum install dnsutils
+              set -x
+              SSL_CONFIG=~/.getssl/getssl.cfg
+              SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
+              cd ~
+              if [ -d .getssl ]; then
+              rm -r .getssl
+              fi
+              if [ -f getssl ]; then
+                rm getssl
+              fi
+              curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl; chmod 700 getssl
+              ./getssl -c ${DOMAIN}
+              sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=${DOMAIN_EMAIL}/" $SSL_CONFIG
+              if [[ "$ENVIRONMENT" = "production" ]]; then
+                sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
+                sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
+              fi
+              sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
+              SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY//\//\\\/}
+              SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY//\//\\\/}
+              sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sudo ./getssl ${DOMAIN}
             fi
-            echo "CERT_EXISTS=$CERT_EXISTS" >> "$GITHUB_OUTPUT"
-  
-      - name: use getssl to generate and sign certificates
-        if: ${{ steps.check-cert.outputs.CERT_EXISTS == 'false' }}
-        env:
-          DOMAIN: ${{ needs.Get-Env-Variables-From-Repo.outputs.domain }}
-          DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
-          SSL_CERT_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_cert_directory }}
-          SSL_KEY_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_key_directory }}
-          SSL_ACME_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_acme_directory }}
-        run: |
-          ssh -T $EC2_USERNAME@$EC2_IP
-          sudo apt-get update
-          sudo apt-get install --assume-yes dnsutils
-          set -x
-          SSL_CONFIG=~/.getssl/getssl.cfg
-          SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
-          cd ~
-          if [ -d .getssl ]; then
-            rm -r .getssl
-          fi
-          if [ -f getssl ]; then
-            rm getssl
-          fi
-          curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl; chmod 700 getssl
-          ./getssl -c ${DOMAIN}
-          sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=${DOMAIN_EMAIL}/" $SSL_CONFIG
-          if [[ "$ENVIRONMENT" = "production" ]]; then
-            sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
-            sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
-          fi
-          sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-          sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-          SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
-          SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY//\//\\\/}
-          SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY//\//\\\/}
-          sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
-          sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-          sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-          sudo ./getssl ${DOMAIN}
     
   EC2-Deploy:
     runs-on: ubuntu-latest
-    needs: [Get-EC2-IP, Get-Env-Variables-From-Repo, Check-HTTPS]
+    needs: [get_env_vars_from_repo, get_ip_and_check_https]
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
     # Then make sure the docker daemon is running
@@ -193,7 +150,7 @@ jobs:
       ENV_CONFIG_FILE: settings.yml
       APP_REPO_CHECKOUT_PATH: app
       EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
-      EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
+    EC2_IP: ${{ needs.get_ip_and_check_https.outputs.ec2-ip }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
 
@@ -270,12 +227,12 @@ jobs:
       - name: set env variables for docker-compose
         env:
           DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
-          ENVIRONMENT: ${{ needs.Get-Env-Variables-From-Repo.outputs.environment }}\
-          DOMAIN: ${{ needs.Get-Env-Variables-From-Repo.outputs.domain }}
+          ENVIRONMENT: ${{ needs.get_env_vars_from_repo.outputs.environment }}\
+          DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
           DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
-          SSL_CERT_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_cert_directory }}
-          SSL_KEY_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_key_directory }}
-          SSL_ACME_DIRECTORY: ${{ needs.Get-Env-Variables-From-Repo.outputs.ssl_acme_directory }}
+          SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
+          SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
+          SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
         run: |
           cd ${GITHUB_WORKSPACE}
           cd $APP_REPO_CHECKOUT_PATH
