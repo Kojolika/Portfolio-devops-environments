@@ -90,6 +90,21 @@ jobs:
           --output text)
           echo "EC2_IP=$EC2_IP" >> "$GITHUB_OUTPUT"
 
+      - name: set ssh identity on github runner
+        env:
+          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          SSH_PRIVATE_KEY_FILE: id_rsa     
+        run: |
+          SSH_DIR=~/.ssh
+          mkdir -p $SSH_DIR
+          chmod 700 $SSH_DIR
+          cd $SSH_DIR
+          ssh-keyscan $EC2_IP > known_hosts
+          echo "$SSH_KEY" > $SSH_PRIVATE_KEY_FILE
+          chmod 600 *
+          eval `ssh-agent -s`
+          ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
+  
       - name: check https
         env:
           INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID_DEV }}
