@@ -108,7 +108,7 @@ jobs:
             SSL_CONFIG=~/.getssl/getssl.cfg  \
             SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg  \
             cd ~  \
-            if [ -d .getssl ]; then \
+            if [ -d .getssl ]; then
             rm -r .getssl \
             fi \
             if [ -f getssl ]; then
