@@ -102,23 +102,25 @@ jobs:
           EC2_IP: ${{ steps.get-ip.outputs.EC2_IP }}
         run: |
           ssh $EC2_USERNAME@$EC2_IP \
-          if [[ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.cert ]]; then \
+          if [[ ! -f "${SSL_CERT_DIRECTORY}${DOMAIN}.cert" ]]
+          then
             sudo yum install dnsutils \
             set -x \
             SSL_CONFIG=~/.getssl/getssl.cfg \
             SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg \
             cd ~  \
-            if [ -d .getssl ]; then \
+            if [ -d .getssl ]; then
             rm -r .getssl \
             fi \
-            if [ -f getssl ]; then \
+            if [ -f getssl ]; then
               rm getssl \
             fi \
             curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl \
             chmod 700 getssl \
             ./getssl -c ${DOMAIN} \
             sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=${DOMAIN_EMAIL}/" $SSL_CONFIG \
-            if [[ "$ENVIRONMENT" = "production" ]]; then \
+            if [[ "$ENVIRONMENT" = "production" ]]; 
+            then
               sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG \
               sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG \
             fi \
