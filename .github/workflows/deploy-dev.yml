@@ -104,9 +104,9 @@ jobs:
           ssh $EC2_USERNAME@$EC2_IP \
           if [[ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.cert ]]; then
             sudo yum install dnsutils \
-            set -x  \
-            SSL_CONFIG=~/.getssl/getssl.cfg  \
-            SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg  \
+            set -x \
+            SSL_CONFIG=~/.getssl/getssl.cfg \
+            SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg \
             cd ~  \
             if [ -d .getssl ]; then
             rm -r .getssl \
