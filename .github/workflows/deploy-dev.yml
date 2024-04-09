@@ -93,7 +93,8 @@ jobs:
       - name: set ssh identity on github runner
         env:
           SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-          SSH_PRIVATE_KEY_FILE: id_rsa     
+          SSH_PRIVATE_KEY_FILE: id_rsa
+          EC2_IP: ${{ steps.get-ip.outputs.EC2_IP }}
         run: |
           SSH_DIR=~/.ssh
           mkdir -p $SSH_DIR
