@@ -118,7 +118,7 @@ jobs:
           EC2_IP: ${{ steps.get-ip.outputs.EC2_IP }}
         run: |
           set -x
-          ssh $EC2_USERNAME@$EC2_IP
+          ssh -f $EC2_USERNAME@$EC2_IP
           if [[ ! -f "${SSL_CERT_DIRECTORY}${DOMAIN}.cert" ]]; then
             sudo yum install dnsutils
             SSL_CONFIG=~/.getssl/getssl.cfg
