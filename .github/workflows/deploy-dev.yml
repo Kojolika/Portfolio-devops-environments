@@ -102,6 +102,7 @@ jobs:
           EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
           EC2_IP: ${{ steps.get-ip.outputs.EC2_IP }}
           SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          ENVIRONMENT: ${{ needs.get_env_vars_from_repo.outputs.environment }}
         with:
           host: ${{ env.EC2_IP }}
           username: ${{ env.EC2_USERNAME }}
@@ -123,16 +124,19 @@ jobs:
               curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
               chmod 700 getssl
               ./getssl -c ${{ env.DOMAIN }}
-              sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${DOMAIN_EMAIL}\"/" $SSL_CONFIG
-              if [[ "$ENVIRONMENT" = "production" ]]; then
+              sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${{ env.DOMAIN_EMAIL }}\"/" $SSL_CONFIG
+              if [[ ${{ env.ENVIRONMENT }} = "production" ]]; then
                 sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
                 sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
               fi
               sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
+              SSL_CERT_DIRECTORY=${{ env.SSL_CERT_DIRECTORY }}
+              SSL_KEY_DIRECTORY=${{ env.SSL_KEY_DIRECTORY }}
+              SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
               SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY//\//\\\/}
               SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY//\//\\\/}
+              SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
               sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
