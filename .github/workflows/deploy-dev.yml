@@ -90,23 +90,8 @@ jobs:
           --output text)
           echo "EC2_IP=$EC2_IP" >> "$GITHUB_OUTPUT"
 
-      - name: set ssh identity on github runner
-        env:
-          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-          SSH_PRIVATE_KEY_FILE: id_rsa
-          EC2_IP: ${{ steps.get-ip.outputs.EC2_IP }}
-        run: |
-          SSH_DIR=~/.ssh
-          mkdir -p $SSH_DIR
-          chmod 700 $SSH_DIR
-          cd $SSH_DIR
-          ssh-keyscan $EC2_IP > known_hosts
-          echo "$SSH_KEY" > $SSH_PRIVATE_KEY_FILE
-          chmod 600 *
-          eval `ssh-agent -s`
-          ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
-  
-      - name: check https
+      - name: ssh and add https if needed
+        uses: appleboy/ssh-action@v1.0.3
         env:
           INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID_DEV }}
           DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
@@ -116,38 +101,43 @@ jobs:
           SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
           EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
           EC2_IP: ${{ steps.get-ip.outputs.EC2_IP }}
-        run: |
-          set -x
-          ssh $EC2_USERNAME@$EC2_IP 2>&1 </dev/null &
-          if [[ ! -f "${SSL_CERT_DIRECTORY}${DOMAIN}.cert" ]]; then
-            sudo yum install dnsutils
-            SSL_CONFIG=~/.getssl/getssl.cfg
-            SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
-            cd ~
-            if [ -d .getssl ]; then
-            rm -r .getssl
+          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+        with:
+          host: ${{ env.EC2_IP }}
+          username: ${{ env.EC2_USERNAME }}
+          key: ${{ env.SSH_KEY }}
+          script: |
+            set -x
+            ssh $EC2_USERNAME@$EC2_IP 2>&1 </dev/null &
+            if [[ ! -f "${SSL_CERT_DIRECTORY}${DOMAIN}.cert" ]]; then
+              sudo yum install dnsutils
+              SSL_CONFIG=~/.getssl/getssl.cfg
+              SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
+              cd ~
+              if [ -d .getssl ]; then
+              rm -r .getssl
+              fi
+              if [ -f getssl ]; then
+                rm getssl
+              fi
+              curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
+              chmod 700 getssl
+              ./getssl -c ${DOMAIN}
+              sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${DOMAIN_EMAIL}\"/" $SSL_CONFIG
+              if [[ "$ENVIRONMENT" = "production" ]]; then
+                sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
+                sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
+              fi
+              sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
+              SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY//\//\\\/}
+              SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY//\//\\\/}
+              sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sudo ./getssl ${DOMAIN}
             fi
-            if [ -f getssl ]; then
-              rm getssl
-            fi
-            curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
-            chmod 700 getssl
-            ./getssl -c ${DOMAIN}
-            sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${DOMAIN_EMAIL}\"/" $SSL_CONFIG
-            if [[ "$ENVIRONMENT" = "production" ]]; then
-              sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
-              sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
-            fi
-            sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-            sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-            SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
-            SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY//\//\\\/}
-            SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY//\//\\\/}
-            sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
-            sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-            sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-            sudo ./getssl ${DOMAIN}
-          fi
 
   EC2-Deploy:
     runs-on: ubuntu-latest
