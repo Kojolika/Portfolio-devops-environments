@@ -122,7 +122,7 @@ jobs:
               fi
               curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
               chmod 700 getssl
-              ./getssl -c ${DOMAIN}
+              ./getssl -c ${{ env.DOMAIN }}
               sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${DOMAIN_EMAIL}\"/" $SSL_CONFIG
               if [[ "$ENVIRONMENT" = "production" ]]; then
                 sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
