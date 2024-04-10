@@ -130,6 +130,7 @@ jobs:
               fi
               sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              DOMAIN=${{ env.DOMAIN }}
               SSL_CERT_DIRECTORY=${{ env.SSL_CERT_DIRECTORY }}
               SSL_KEY_DIRECTORY=${{ env.SSL_KEY_DIRECTORY }}
               SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
