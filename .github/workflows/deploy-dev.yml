@@ -213,7 +213,7 @@ jobs:
             sudo mkdir -p ${SSL_KEY_DIRECTORY}
             sudo touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
             sudo touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
-            openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+            sudo openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
           fi
 
       - name: run commands on ec2 through ssh
