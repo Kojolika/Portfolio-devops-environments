@@ -211,8 +211,8 @@ jobs:
           if [ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.crt ]; then
             ssh ${EC2_USERNAME}@${EC2_IP} mkdir -p ${SSL_CERT_DIRECTORY}
             ssh ${EC2_USERNAME}@${EC2_IP} mkdir -p ${SSL_KEY_DIRECTORY}
-            ssh ${EC2_USERNAME}@${EC2_IP} > ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
-            ssh ${EC2_USERNAME}@${EC2_IP} > ${SSL_KEY_DIRECTORY}${DOMAIN}.key
+            ssh ${EC2_USERNAME}@${EC2_IP} touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+            ssh ${EC2_USERNAME}@${EC2_IP} touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
             ssh ${EC2_USERNAME}@${EC2_IP} openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
           fi
 
