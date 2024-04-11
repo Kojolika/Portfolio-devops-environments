@@ -211,8 +211,8 @@ jobs:
           if [ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.crt ]; then
             sudo mkdir -p ${SSL_CERT_DIRECTORY}
             sudo mkdir -p ${SSL_KEY_DIRECTORY}
-            touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
-            touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
+            sudo touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+            sudo touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
             openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
           fi
 
