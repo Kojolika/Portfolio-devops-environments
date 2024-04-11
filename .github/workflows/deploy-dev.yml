@@ -207,7 +207,7 @@ jobs:
           echo "SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY}" >> .env
 
       - name: set up temp crt and key files if needed
-        run:
+        run: |
           if [ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.crt ]; then
             mkdir -p ${SSL_CERT_DIRECTORY}
             mkdir -p ${SSL_KEY_DIRECTORY}
@@ -219,14 +219,14 @@ jobs:
       - name: run commands on ec2 through ssh
         env:
           EC2_CONTEXT: ec2
-        run: 
-          cd $APP_REPO_CHECKOUT_PATH;
-          docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}";
-          docker context use $EC2_CONTEXT;
-          echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin;
-          docker-compose down;
-          docker system prune -a -f;
-          docker-compose up -d;
+        run: |
+          cd $APP_REPO_CHECKOUT_PATH
+          docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
+          docker context use $EC2_CONTEXT
+          echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin
+          docker-compose down
+          docker system prune -a -f
+          docker-compose up -d
 
       - name: check if both containers are running
         # We subtract 1 since we're counting the lines of the stdin, the first line is the table header
