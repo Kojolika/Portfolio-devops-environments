@@ -209,13 +209,13 @@ jobs:
       - name: create temporary ssl crt and key files
         run: |
           if [ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.crt ]; then
-            ssh ${EC2_USERNAME}@${EC2_IP} sudo mkdir -p ${SSL_CERT_DIRECTORY}
-            ssh ${EC2_USERNAME}@${EC2_IP} sudo mkdir -p ${SSL_KEY_DIRECTORY}
+            ssh ${EC2_USERNAME}@${EC2_IP} mkdir -p ${SSL_CERT_DIRECTORY}
+            ssh ${EC2_USERNAME}@${EC2_IP} mkdir -p ${SSL_KEY_DIRECTORY}
             ssh ${EC2_USERNAME}@${EC2_IP} > ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
             ssh ${EC2_USERNAME}@${EC2_IP} > ${SSL_KEY_DIRECTORY}${DOMAIN}.key
             ssh ${EC2_USERNAME}@${EC2_IP} openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
-          fi          
- 
+          fi
+
       - name: run commands on ec2 through ssh
         env:
           EC2_CONTEXT: ec2
@@ -285,7 +285,6 @@ jobs:
               sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i E "s/#RELOAD_CMD=\"[^\"]*\"/RELOAD_CMD=\"docker exec app_nginx_1 sudo systemctl reload nginx\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              DOMAIN=${{ env.DOMAIN }}
               SSL_CERT_DIRECTORY=${{ env.SSL_CERT_DIRECTORY }}
               SSL_KEY_DIRECTORY=${{ env.SSL_KEY_DIRECTORY }}
               SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}

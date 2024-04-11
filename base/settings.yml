@@ -6,6 +6,6 @@ deployment:
     protocol: tcp
   ssl:
     directories:
-      cert: /etc/nginx/certificates/
-      key: /etc/nginx/private/
-      acme-challenge: /var/www/${DOMAIN}/
+      cert: /portfolio/nginx/certificates/
+      key: /portfolio/nginx/private/
+      acme-challenge: /portfolio/nginx/acme/
