@@ -114,6 +114,7 @@ jobs:
       SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
       SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
       DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
+      SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
 
     steps:
       - name: setup yq
@@ -172,8 +173,7 @@ jobs:
 
       - name: set ssh identity on github runner
         env:
-          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-          SSH_PRIVATE_KEY_FILE: id_rsa     
+          SSH_PRIVATE_KEY_FILE: id_rsa
         run: |
           SSH_DIR=~/.ssh
           mkdir -p $SSH_DIR
@@ -208,13 +208,6 @@ jobs:
 
       - name: set up temp crt and key files if needed
         uses: appleboy/ssh-action@v1.0.3
-        env:
-          DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
-          SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
-          SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
-          EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
-          EC2_IP: ${{ needs.Get_EC2_IP.outputs.ec2-ip }}
-          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
         with:
           host: ${{ env.EC2_IP }}
           username: ${{ env.EC2_USERNAME }}
