@@ -208,6 +208,12 @@ jobs:
       
       - name: create temporary ssl crt and key files
         run: |
+          if [ -d $SSL_CERT_DIRECTORY} ]; then
+            mkdir -p ${SSL_CERT_DIRECTORY}
+          fi
+          if [ -d ${SSL_KEY_DIRECTORY} ]; then
+            mkdir -p ${SSL_KEY_DIRECTORY}
+          fi
           ssh ${EC2_USERNAME}@${EC2_IP} openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
  
       - name: run commands on ec2 through ssh
