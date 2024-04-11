@@ -213,7 +213,7 @@ jobs:
           SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
           SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
           EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
-          EC2_IP: ${{ steps.get-ip.outputs.EC2_IP }}
+          EC2_IP: ${{ needs.Get_EC2_IP.outputs.ec2-ip }}
           SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
         with:
           host: ${{ env.EC2_IP }}
@@ -250,7 +250,7 @@ jobs:
   
   Verify_HTTPS:
     runs-on: ubuntu-latest
-    needs: EC2-Deploy
+    needs: [EC2-Deploy, Get_EC2_IP, get_env_vars_from_repo]
 
     steps:
       - name: ssh and add https if needed
@@ -263,7 +263,7 @@ jobs:
           SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
           SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
           EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
-          EC2_IP: ${{ steps.get-ip.outputs.EC2_IP }}
+          EC2_IP: ${{ needs.Get_EC2_IP.outputs.ec2-ip }}
           SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
           ENVIRONMENT: ${{ needs.get_env_vars_from_repo.outputs.environment }}
         with:
