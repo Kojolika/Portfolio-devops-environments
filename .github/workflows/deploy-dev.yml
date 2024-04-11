@@ -214,6 +214,8 @@ jobs:
             sudo touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
             sudo touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
             sudo openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+            ls ${SSL_KEY_DIRECTORY}
+            ls ${SSL_CERT_DIRECTORY}
           fi
 
       - name: run commands on ec2 through ssh
