@@ -208,15 +208,13 @@ jobs:
       
       - name: create temporary ssl crt and key files
         run: |
-          if [ -d $SSL_CERT_DIRECTORY} ]; then
-            sudo mkdir -p ${SSL_CERT_DIRECTORY}
-          fi
-          if [ -d ${SSL_KEY_DIRECTORY} ]; then
-            sudo mkdir -p ${SSL_KEY_DIRECTORY}
-          fi
-          touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
-          touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
-          ssh ${EC2_USERNAME}@${EC2_IP} openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+          if [ -f ${SSL_CERT_DIRECTORY}${DOMAIN}.crt ]; then
+            ssh ${EC2_USERNAME}@${EC2_IP} sudo mkdir -p ${SSL_CERT_DIRECTORY}
+            ssh ${EC2_USERNAME}@${EC2_IP} sudo mkdir -p ${SSL_KEY_DIRECTORY}
+            ssh ${EC2_USERNAME}@${EC2_IP} > ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+            ssh ${EC2_USERNAME}@${EC2_IP} > ${SSL_KEY_DIRECTORY}${DOMAIN}.key
+            ssh ${EC2_USERNAME}@${EC2_IP} openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+          fi          
  
       - name: run commands on ec2 through ssh
         env:
