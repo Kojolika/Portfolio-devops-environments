@@ -214,7 +214,9 @@ jobs:
           if [ -d ${SSL_KEY_DIRECTORY} ]; then
             sudo mkdir -p ${SSL_KEY_DIRECTORY}
           fi
-          ssh ${EC2_USERNAME}@${EC2_IP} openssl req -nodes -new -x509 -subj "/CN=localhost" -newkey -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+          touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
+          touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+          ssh ${EC2_USERNAME}@${EC2_IP} openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
  
       - name: run commands on ec2 through ssh
         env:
