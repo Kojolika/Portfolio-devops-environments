@@ -159,13 +159,13 @@ jobs:
             echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+" >> "$GITHUB_ENV"
             echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
           fi
-      
+
       - name: add version and build to job outputs
         id: version-outputs
         run: |
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "BUILD=$BUILD" >> "$GITHUB_OUTPUT"
-      
+
       - name: hide EC2 ip
         run: |
           echo "::add-mask::$EC2_IP"
@@ -205,16 +205,28 @@ jobs:
           echo "SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY}" >> .env
           echo "SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY}" >> .env
           echo "SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY}" >> .env
-      
-      - name: create temporary ssl crt and key files
-        run: |
-          if [ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.crt ]; then
-            ssh ${EC2_USERNAME}@${EC2_IP} mkdir -p ${SSL_CERT_DIRECTORY}
-            ssh ${EC2_USERNAME}@${EC2_IP} mkdir -p ${SSL_KEY_DIRECTORY}
-            ssh ${EC2_USERNAME}@${EC2_IP} touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
-            ssh ${EC2_USERNAME}@${EC2_IP} touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
-            ssh ${EC2_USERNAME}@${EC2_IP} openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
-          fi
+
+      - name: set up temp crt and key files if needed
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
+          SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
+          SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
+          EC2_IP: ${{ steps.get-ip.outputs.EC2_IP }}
+          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+        with:
+          host: ${{ env.EC2_IP }}
+          username: ${{ env.EC2_USERNAME }}
+          key: ${{ env.SSH_KEY }}
+          script: |
+            if [ ! -f ${SSL_CERT_DIRECTORY}${DOMAIN}.crt ]; then
+              mkdir -p ${SSL_CERT_DIRECTORY}
+              mkdir -p ${SSL_KEY_DIRECTORY}
+              touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+              touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
+              openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+            fi
 
       - name: run commands on ec2 through ssh
         env:
