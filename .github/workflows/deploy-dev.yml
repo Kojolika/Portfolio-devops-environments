@@ -226,6 +226,7 @@ jobs:
           docker-compose down
           docker system prune -a -f
           docker-compose up -d
+          docker compose push nginx
 
       - name: check if both containers are running
         # We subtract 1 since we're counting the lines of the stdin, the first line is the table header
@@ -259,7 +260,7 @@ jobs:
           key: ${{ env.SSH_KEY }}
           script: |
             set -x
-            docker exec -i app_nginx_1 sh
+            cat <<EOF | docker exec -i app_nginx_1 sh
             if curl https://${{ env.DOMAIN }}; then
               echo "HTTPS is working correctly"
             else
@@ -296,6 +297,7 @@ jobs:
               sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sudo ./getssl ${{ env.DOMAIN }}
             fi
+            EOF
 
   Set-Version-In-Repo:
     runs-on: ubuntu-latest
