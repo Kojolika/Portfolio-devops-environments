@@ -211,8 +211,8 @@ jobs:
           cd $APP_REPO_CHECKOUT_PATH
           mkdir -p ${SSL_CERT_DIRECTORY}
           mkdir -p ${SSL_KEY_DIRECTORY}
-          touch ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
-          touch ${SSL_KEY_DIRECTORY}${DOMAIN}.key
+          touch ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
+          touch ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
           openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
 
       - name: run commands on ec2 through ssh
@@ -266,7 +266,7 @@ jobs:
             if curl https://${DOMAIN}; then
               echo "HTTPS is working correctly"
             else
-              rm ${{ env.SSL_CERT_DIRECTORY }}${DOMAIN}.crt
+              rm ${{ env.SSL_CERT_DIRECTORY }}/${DOMAIN}.crt
               apt-get update
               apt-get -y install dnsutils
               cd ~

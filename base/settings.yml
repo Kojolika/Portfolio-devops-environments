@@ -6,6 +6,6 @@ deployment:
     protocol: tcp
   ssl:
     directories: #paths are relative
-      cert: nginx/certificates/
-      key: nginx/private/
-      acme-challenge: nginx/acme/
+      cert: nginx/certificates
+      key: nginx/private
+      acme-challenge: nginx/acme
