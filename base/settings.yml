@@ -8,4 +8,4 @@ deployment:
     directories: #paths are relative
       cert: nginx/certificates
       key: nginx/private
-      acme-challenge: nginx/acme
+      acme-challenge: /etc/nginx/acme
