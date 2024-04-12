@@ -282,7 +282,7 @@ jobs:
               fi
               sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#RELOAD_CMD=\"[^\"]*\"/RELOAD_CMD=\"docker exec app_nginx_1 sudo systemctl reload nginx\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/#RELOAD_CMD=\"[^\"]*\"/RELOAD_CMD=\"systemctl reload nginx\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               SSL_CERT_DIRECTORY="/etc/ssl/certs/"
               SSL_KEY_DIRECTORY="/etc/ssl/private/"
               SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
