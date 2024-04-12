@@ -245,7 +245,6 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID_DEV }}
-          DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
           DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
           SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
           SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
@@ -264,21 +263,15 @@ jobs:
           script: |
             set -x
             cat <<EOF | docker exec -i app_nginx_1 sh
-            if curl https://${{ env.DOMAIN }}; then
+            if curl https://${DOMAIN}; then
               echo "HTTPS is working correctly"
             else
-              rm ${{ env.SSL_CERT_DIRECTORY }}${{ env.DOMAIN }}.crt
+              rm ${{ env.SSL_CERT_DIRECTORY }}${DOMAIN}.crt
               apt-get update
               apt-get -y install dnsutils
               SSL_CONFIG=~/.getssl/getssl.cfg
-              SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${{ env.DOMAIN }}/getssl.cfg
+              SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
               cd ~
-              if [ -d .getssl ]; then
-                rm -r .getssl
-              fi
-              if [ -f getssl ]; then
-                rm getssl
-              fi
               curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
               chmod 700 getssl
               ./getssl -c
