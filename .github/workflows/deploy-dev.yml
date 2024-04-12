@@ -265,8 +265,8 @@ jobs:
               echo "HTTPS is working correctly"
             else
               rm ${{ env.SSL_CERT_DIRECTORY }}${{ env.DOMAIN }}.crt
-              apt update
-              apt install dnsutils
+              apt-get update
+              apt-get -y install dnsutils
               SSL_CONFIG=~/.getssl/getssl.cfg
               SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${{ env.DOMAIN }}/getssl.cfg
               cd ~
