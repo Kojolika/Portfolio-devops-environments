@@ -264,8 +264,8 @@ jobs:
             if curl https://${{ env.DOMAIN }}; then
               echo "HTTPS is working correctly"
             else
-              sudo rm ${{ env.SSL_CERT_DIRECTORY }}${{ env.DOMAIN }}.crt
-              sudo yum install dnsutils
+              rm ${{ env.SSL_CERT_DIRECTORY }}${{ env.DOMAIN }}.crt
+              yum install dnsutils
               SSL_CONFIG=~/.getssl/getssl.cfg
               SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${{ env.DOMAIN }}/getssl.cfg
               cd ~
@@ -295,7 +295,7 @@ jobs:
               sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sudo ./getssl ${{ env.DOMAIN }}
+              ./getssl ${{ env.DOMAIN }}
             fi
             EOF
 
