@@ -5,7 +5,7 @@ deployment:
     port: 8080
     protocol: tcp
   ssl:
-    directories:
-      cert: /portfolio/nginx/certificates/
-      key: /portfolio/nginx/private/
-      acme-challenge: /portfolio/nginx/acme/
+    directories: #paths are relative
+      cert: portfolio/nginx/certificates/
+      key: portfolio/nginx/private/
+      acme-challenge: portfolio/nginx/acme/
