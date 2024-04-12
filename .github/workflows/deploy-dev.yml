@@ -293,7 +293,7 @@ jobs:
               sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sudo ./getssl ${DOMAIN}
+              sudo ./getssl ${{ env.DOMAIN }}
             fi
 
   Set-Version-In-Repo:
