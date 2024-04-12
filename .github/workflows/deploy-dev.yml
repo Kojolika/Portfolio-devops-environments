@@ -258,7 +258,7 @@ jobs:
           username: ${{ env.EC2_USERNAME }}
           key: ${{ env.SSH_KEY }}
           script: |
-            docker exec -ti app_nginx_1 sh
+            docker exec -i app_nginx_1 sh
             set -x
             if curl https://${{ env.DOMAIN }}; then
               echo "HTTPS is working correctly"
