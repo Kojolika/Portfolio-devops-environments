@@ -262,7 +262,7 @@ jobs:
           # due to how getssl is written, we dont need to specify it
           script: |
             set -x
-            cat <<'EOF' | docker exec -e ENVIRONMENT=${{ env.ENVIRONMENT }} -i app_nginx_1 sh
+            cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
             if curl https://${DOMAIN}; then
               echo "HTTPS is working correctly"
             else
@@ -276,7 +276,7 @@ jobs:
               SSL_CONFIG=~/.getssl/getssl.cfg
               SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
               sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${{ env.DOMAIN_EMAIL }}\"/" $SSL_CONFIG
-              if [[ ${ENVIRONMENT} = 'production' ]]; then
+              if [[ ${{ env.ENVIRONMENT }} = 'production' ]]; then
                 sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
                 sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
               fi
