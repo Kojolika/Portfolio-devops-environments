@@ -5,7 +5,7 @@ deployment:
     port: 8080
     protocol: tcp
   ssl:
-    directories: #paths are relative
+    directories:
       cert: nginx/certificates
       key: nginx/private
       acme-challenge: /etc/nginx/acme/.well-known/acme-challenge
