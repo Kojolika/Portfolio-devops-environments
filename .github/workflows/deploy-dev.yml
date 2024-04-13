@@ -2,7 +2,7 @@ name: Deploy App to Dev Server
 
 on:
   push:
-    paths: ['envs/testing/settings.yml', 'envs/testing/deployment.yml']
+#  paths: ['envs/testing/settings.yml', 'envs/testing/deployment.yml']
   repository_dispatch:
     types: [pr-merged-to-main]
 
@@ -10,18 +10,21 @@ permissions:
   contents: write
 
 jobs:
-  Get-EC2-IP:
+  get_env_vars_from_repo:
     runs-on: ubuntu-latest
 
     outputs:
-      ec2-ip: ${{ steps.get-ip.outputs.EC2_IP }}
-
-    # This is required for requesting the JWT from AWS
-    permissions:
-      id-token: write 
+      domain: ${{ steps.dev_specific_variables.outputs.domain }}
+      environment: ${{ steps.dev_specific_variables.outputs.environment }}
+      aws_zone: ${{ steps.dev_specific_variables.outputs.aws_zone }}
+      ssl_cert_directory: ${{ steps.base_variables.outputs.ssl_cert_directory }}
+      ssl_key_directory: ${{ steps.base_variables.outputs.ssl_key_directory }}
+      ssl_acme_directory: ${{ steps.base_variables.outputs.ssl_acme_directory }}
 
     env:
-      DEV_SETTINGS_FOLDER: "envs/testing"
+      BASE_SETTINGS_FILE: ./base/settings.yml
+      ENV_SETTINGS_FILE: settings.yml
+      DEV_SETTINGS_FOLDER: ./envs/testing
 
     steps:
       - name: setup yq
@@ -30,12 +33,46 @@ jobs:
       - name: checkout repo
         uses: actions/checkout@v4
 
-      - name: get aws region
+      - name: output specific env variables
+        id: dev_specific_variables
         run: |
+          BASE_DOMAIN=$(yq '.deployment.domain' $BASE_SETTINGS_FILE)
           cd $DEV_SETTINGS_FOLDER
+          SUB_DOMAIN=$(yq '.specifics | load(.deployment) | .app.subdomain' $ENV_SETTINGS_FILE)
+          if [[ ! -z $SUB_DOMAIN ]]; then
+            SUB_DOMAIN="$SUB_DOMAIN."
+          fi
+          echo "domain=${SUB_DOMAIN}${BASE_DOMAIN}" >> "$GITHUB_OUTPUT"
+          ENVIRONMENT=$(yq '.specifics | load(.deployment) | .app.environment' $ENV_SETTINGS_FILE)
+          echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
           AWS_ZONE=$(yq '.app.aws-zone' deployment.yml)
-          echo "AWS_ZONE=$AWS_ZONE" >> "$GITHUB_ENV"
+          echo "aws_zone=$AWS_ZONE" >> "$GITHUB_OUTPUT"
+
+      - name: output base env variables
+        id: base_variables
+        run: |
+          CERT_DIRECTORY=$(yq '.deployment.ssl.directories.cert' $BASE_SETTINGS_FILE)
+          KEY_DIRECTORY=$(yq '.deployment.ssl.directories.key' $BASE_SETTINGS_FILE)
+          ACME_CHALLENGE_DIRECTORY=$(yq '.deployment.ssl.directories.acme-challenge' $BASE_SETTINGS_FILE)
+          echo "ssl_cert_directory=$CERT_DIRECTORY" >> "$GITHUB_OUTPUT"
+          echo "ssl_key_directory=$KEY_DIRECTORY" >> "$GITHUB_OUTPUT"
+          echo "ssl_acme_directory=$ACME_CHALLENGE_DIRECTORY" >> "$GITHUB_OUTPUT"
+
+  Get_EC2_IP:
+    runs-on: ubuntu-latest
+    needs: [get_env_vars_from_repo]
+
+    outputs:
+      ec2-ip: ${{ steps.get-ip.outputs.EC2_IP }}
+
+    # This is required for requesting the JWT from AWS
+    permissions:
+      id-token: write
     
+    env:
+      AWS_ZONE: ${{ needs.get_env_vars_from_repo.outputs.aws_zone }}
+
+    steps:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -55,7 +92,7 @@ jobs:
 
   EC2-Deploy:
     runs-on: ubuntu-latest
-    needs: Get-EC2-IP
+    needs: [get_env_vars_from_repo, Get_EC2_IP]
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
     # Then make sure the docker daemon is running
@@ -71,9 +108,13 @@ jobs:
       ENV_CONFIG_FILE: settings.yml
       APP_REPO_CHECKOUT_PATH: app
       EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
-      EC2_IP: ${{ needs.Get-EC2-IP.outputs.ec2-ip }}
+      EC2_IP: ${{ needs.Get_EC2_IP.outputs.ec2-ip }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+      SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
+      SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
+      DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
+      SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
 
     steps:
       - name: setup yq
@@ -93,8 +134,7 @@ jobs:
         run: |
           cd $ENV_CONFIG_PATH
           echo -n "PORT=" >> "$GITHUB_ENV" && yq 'load(.resources[0]) | .deployment.ports.port' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
-          echo -n "AWS_ZONE=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .ec2-zone' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
-          echo -n "NODE_ENV=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .containers[] | select(.name == "dev") | .environment' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
+          echo -n "AWS_ZONE=" >> "$GITHUB_ENV" && yq '.specifics | load(.deployment) | .app.aws-zone' $ENV_CONFIG_FILE >> "$GITHUB_ENV"
 
       - name: get build and verison number
         run: |
@@ -120,18 +160,20 @@ jobs:
             echo -n "VERSION=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "[0-9]+\.[0-9]+\.[0-9]+" >> "$GITHUB_ENV"
             echo -n "BUILD=" >> "$GITHUB_ENV" && echo "$IMAGE" |  grep -P -o "(?<=\-)[0-9]+" >> "$GITHUB_ENV"
           fi
-      
+
       - name: add version and build to job outputs
         id: version-outputs
         run: |
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
           echo "BUILD=$BUILD" >> "$GITHUB_OUTPUT"
-      
+
       - name: hide EC2 ip
         run: |
           echo "::add-mask::$EC2_IP"
 
       - name: set ssh identity on github runner
+        env:
+          SSH_PRIVATE_KEY_FILE: id_rsa
         run: |
           SSH_DIR=~/.ssh
           mkdir -p $SSH_DIR
@@ -143,24 +185,39 @@ jobs:
           eval `ssh-agent -s`
           ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
 
-        env:
-          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-          SSH_PRIVATE_KEY_FILE: id_rsa
-
       - name: set env variables for docker-compose
+        env:
+          DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
+          ENVIRONMENT: ${{ needs.get_env_vars_from_repo.outputs.environment }}
+          DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
+          SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
         run: |
           cd ${GITHUB_WORKSPACE}
           cd $APP_REPO_CHECKOUT_PATH
-          echo "NODE_ENV=$NODE_ENV" >> .env
+          echo "ENVIRONMENT=$ENVIRONMENT" >> .env
+          echo "NODE_ENV=$ENVIRONMENT" >> .env
           echo "PORT=$PORT" >> .env
           echo "AWS_ZONE=$AWS_ZONE" >> .env
           echo "BUILD=${VERSION}+${BUILD}" >> .env
           echo "LATEST_IMAGE=${DOCKER_REPO}:${IMAGE}" >> .env
-          
-        env:
-          DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
- 
+          echo "DOMAIN=${DOMAIN}" >> .env
+          echo "DOMAIN_EMAIL=${DOMAIN_EMAIL}" >> .env
+          echo "SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY}" >> .env
+          echo "SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY}" >> .env
+          echo "SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY}" >> .env
+
+      - name: set up temp crt and key files
+        run: |
+          cd $APP_REPO_CHECKOUT_PATH
+          mkdir -p ${SSL_CERT_DIRECTORY}
+          mkdir -p ${SSL_KEY_DIRECTORY}
+          touch ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
+          touch ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
+          openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
+
       - name: run commands on ec2 through ssh
+        env:
+          EC2_CONTEXT: ec2
         run: |
           cd $APP_REPO_CHECKOUT_PATH
           docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
@@ -169,9 +226,7 @@ jobs:
           docker-compose down
           docker system prune -a -f
           docker-compose up -d
-
-        env:
-          EC2_CONTEXT: ec2
+          docker compose push nginx
 
       - name: check if both containers are running
         # We subtract 1 since we're counting the lines of the stdin, the first line is the table header
@@ -181,6 +236,66 @@ jobs:
             exit 1;
           fi
   
+  Verify_HTTPS:
+    runs-on: ubuntu-latest
+    needs: [EC2-Deploy, Get_EC2_IP, get_env_vars_from_repo]
+
+    steps:
+      - name: ssh and add https if needed
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID_DEV }}
+          DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
+          SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
+          SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
+          SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
+          EC2_IP: ${{ needs.Get_EC2_IP.outputs.ec2-ip }}
+          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          ENVIRONMENT: ${{ needs.get_env_vars_from_repo.outputs.environment }}
+        with:
+          host: ${{ env.EC2_IP }}
+          username: ${{ env.EC2_USERNAME }}
+          key: ${{ env.SSH_KEY }}
+          # regarding use of getssl, typically we would need to specify the domain name but 
+          # since out docker container has DOMAIN set as an env,
+          # due to how getssl is written, we dont need to specify it
+          script: |
+            set -x
+            cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
+            if curl https://${DOMAIN}; then
+              echo "HTTPS is working correctly"
+            else
+              rm ${{ env.SSL_CERT_DIRECTORY }}/${DOMAIN}.crt
+              apt-get update
+              apt-get -y install dnsutils
+              cd ~
+              curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
+              chmod 700 getssl
+              ./getssl -c
+              SSL_CONFIG=~/.getssl/getssl.cfg
+              SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
+              sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${{ env.DOMAIN_EMAIL }}\"/" $SSL_CONFIG
+              if [[ ${{ env.ENVIRONMENT }} = 'production' ]]; then
+                sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
+                sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
+              fi
+              sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/#RELOAD_CMD=\"[^\"]*\"/RELOAD_CMD=\"\/etc\/init.d\/nginx reload\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              SSL_CERT_DIRECTORY="/etc/ssl/certs/"
+              SSL_KEY_DIRECTORY="/etc/ssl/private/"
+              SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
+              SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY//\//\\\/}
+              SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY//\//\\\/}
+              SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
+              sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+              ./getssl
+            fi
+            EOF
+
   Set-Version-In-Repo:
     runs-on: ubuntu-latest
     needs: EC2-Deploy
