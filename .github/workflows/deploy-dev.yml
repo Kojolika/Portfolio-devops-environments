@@ -270,6 +270,7 @@ jobs:
               echo "HTTPS is working correctly"
             else
               cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
+              set -x
               rm ${{ env.SSL_CERT_DIRECTORY }}/${DOMAIN}.crt
               apt-get update
               apt-get -y install dnsutils
