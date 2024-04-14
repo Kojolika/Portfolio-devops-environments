@@ -225,7 +225,7 @@ jobs:
           if [ ! -d ${SSL_CERT_DIRECTORY} ]; then
             sudo mkdir -p ${SSL_CERT_DIRECTORY}
           fi
-          if [ ! -d ${SSL_KEY_DIRECTORY} ]; Then
+          if [ ! -d ${SSL_KEY_DIRECTORY} ]; then
             sudo mkdir -p ${SSL_KEY_DIRECTORY}
           fi
           sudo echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
