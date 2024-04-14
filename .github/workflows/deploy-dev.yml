@@ -206,16 +206,22 @@ jobs:
           echo "SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY}" >> .env
           echo "SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY}" >> .env
 
-      - name: add crt and key files
-        env:
-          CERT: ${{ secrets.SSL_CERT_DEV }}
-          KEY: ${{ secrets.SSL_KEY_DEV }}
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+            aws-region: ${{ needs.get_env_vars_from_repo.outputs.aws_zone }}
+            role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
+  
+      - name: Get ssl cert and key from AWS
         run: |
-          cd $APP_REPO_CHECKOUT_PATH
-          mkdir -p ${SSL_CERT_DIRECTORY}
-          mkdir -p ${SSL_KEY_DIRECTORY}
-          echo "$CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
-          echo "$KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
+          SSL_KEY=$(aws secretsmanager get-secret-value --secret-id SSL_KEY_DEV | \
+          grep -o -P "(?<=\"SecretString\": \")[^\"]*\"")
+          SSL_CERT=$(aws secretsmanager get-secret-value --secret-id SSL_CERT_DEV | \
+          grep -o -P "(?<=\"SecretString\": \")[^\"]*\"")
+          sudo mkdir -p ${SSL_CERT_DIRECTORY}
+          sudo mkdir -p ${SSL_KEY_DIRECTORY}
+          sudo echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
+          sudo echo "$SS_KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
 
       - name: run commands on ec2 through ssh
         env:
@@ -243,8 +249,35 @@ jobs:
     needs: [EC2-Deploy, Get_EC2_IP, get_env_vars_from_repo]
 
     steps:
-      - name: update cert and key if needed
+      - name: Check if HTTPS is configured correctly
         uses: appleboy/ssh-action@v1.0.3
+        id: https_verified
+        env:           
+          EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
+          EC2_IP: ${{ needs.Get_EC2_IP.outputs.ec2-ip }}
+          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
+          SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
+        with:
+          host: ${{ env.EC2_IP }}
+          username: ${{ env.EC2_USERNAME }}
+          key: ${{ env.SSH_KEY }}
+          script: |
+          IS_HTTPS_SETUP=$(cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
+          if true | openssl s_client -connect $DOMAIN:443 2>/dev/null | \
+          openssl x509 -noout -checkend 0 && openssl verify ${{ env.SSL_CERT_DIRECTORY }}/$DOMAIN.crt; then
+            HTTPS_SETUP='true'
+          else
+            HTTPS_SETUP='false'
+          fi
+          echo "$HTTPS_SETUP"
+          EOF
+          )
+          echo "HTTPS_SETUP=$IS_HTTPS_SETUP" >> "$GITHUB_OUTPUT"
+
+      - name: create new cert and key
+        uses: appleboy/ssh-action@v1.0.3
+        if: ${{ steps.https_verified.outputs.HTTPS_SETUP == 'false' }}
+        id: get_cert_and_key
         env:
           INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID_DEV }}
           DOMNAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
@@ -265,63 +298,63 @@ jobs:
           # since out docker container has DOMAIN set as an env,
           # due to how getssl is written, we dont need to specify it
           script: |
-            cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
-            SSL_CERT_DIRECTORY="/etc/ssl/certs"
-            SSL_KEY_DIRECTORY="/etc/ssl/private"
-            SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
-            if true | openssl s_client -connect $DOMAIN:443 2>/dev/null | \
-            openssl x509 -noout -checkend 0 && openssl verify $SSL_CERT_DIRECTORY/$DOMAIN.crt; then
-              echo "HTTPS is working correctly"
-            else
-              set -x
-              rm $SSL_CERT_DIRECTORY/${DOMAIN}.crt
-              apt-get update
-              apt-get -y install dnsutils
-              cd ~
-              curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
-              chmod 700 getssl
-              ./getssl -c
-              SSL_CONFIG=~/.getssl/getssl.cfg
-              SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
-              sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${{ env.DOMAIN_EMAIL }}\"/" $SSL_CONFIG
-              if [[ ${{ env.ENVIRONMENT }} = 'production' ]]; then
-                sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
-                sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
-              fi
-              sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#RELOAD_CMD=\"[^\"]*\"/RELOAD_CMD=\"\/etc\/init.d\/nginx reload\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY//\//\\\/}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY//\//\\\/}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY//\//\\\/}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              ./getssl
-              SSL_CERT=${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
-              SSL_KEY=${SSL_KEY_DIRECTORY}/${DOMAIN}.key
-              echo "Getting key id for Github API secrets..."
-              KEY_ID=$(curl -i -L \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${{ env.TOKEN }}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/${{ github.repository }}/actions/secrets/public-key \
-              | grep -P -o "(?<=\"key_id\": \")[^\"]*(?=\")")
-              echo "Updating ssl cert secret..."
-              curl -i -L \
-              -X PUT \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${{ env.TOKEN }}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/${{ github.repository }}/actions/secrets/SSL_CERT_DEV \
-              -d "{\"encrypted_value\":\"${SSL_CERT}",\"key_id\":\"${KEY_ID}\"}"
-              echo "Updating ssl key secret..."
-              curl -i -L \
-              -X PUT \
-              -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${{ env.TOKEN }}" \
-              -H "X-GitHub-Api-Version: 2022-11-28" \
-              https://api.github.com/repos/${{ github.repository }}/actions/secrets/SSL_KEY_DEV \
-              -d "{\"encrypted_value\":\"${SSL_KEY}",\"key_id\":\"${KEY_ID}\"}"
+            CERT_AND_KEY=$(cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
+            rm ${{ SSL_CERT_DIRECTORY }}/${DOMAIN}.crt
+            rm ${{ SSL_KEY_DIRECTORY }}/${DOMAIN}.key
+            apt-get update
+            apt-get -y install dnsutils
+            cd ~
+            curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
+            chmod 700 getssl
+            ./getssl -c
+            SSL_CONFIG=~/.getssl/getssl.cfg
+            SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
+            sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${{ env.DOMAIN_EMAIL }}\"/" $SSL_CONFIG
+            if [[ ${{ env.ENVIRONMENT }} = 'production' ]]; then
+              sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
+              sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
             fi
+            sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            sed -i -E "s/#RELOAD_CMD=\"[^\"]*\"/RELOAD_CMD=\"\/etc\/init.d\/nginx reload\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            SSL_CERT_DIRECTORY=${{ SSL_CERT_DIRECTORY }}
+            SSL_KEY_DIRECTORY=${{ SSL_KEY_DIRECTORY }}
+            SSL_ACME_DIRECTORY=${{ SSL_ACME_DIRECTORY }}
+            sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY//\//\\\/}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY//\//\\\/}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY//\//\\\/}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
+            ./getssl
+            echo "SSL_KEY=$(cat ${{ SSL_CERT_DIRECTORY }}/$DOMAIN.key)"
+            echo "SSL_CERT=$(cat ${{ SSL_CERT_DIRECTORY }}/$DOMAIN.crt)"
             EOF
+            )
+            SSL_KEY=$(echo "$CERT_AND_KEY" | grep -o -P "(?<=SSL_KEY=).*")
+            SSL_CERT=$(echo "$CERT_AND_KEY" | grep -o -P "(?<=SSL_CERT=).*")
+            echo "SSL_KEY=$SSL_KEY" >> "$GITHUB_OUTPUT"
+            echo "SSL_CERT=$SSL_CERT" >> "$GITHUB_OUTPUT"
+
+        - name: Configure AWS Credentials
+          uses: aws-actions/configure-aws-credentials@v4
+          if: ${{ steps.https_verified.outputs.HTTPS_SETUP == 'false' }}
+          with:
+            aws-region: ${{ needs.get_env_vars_from_repo.outputs.aws_zone }}
+            role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
+
+        - name: update AWS secrets
+          if: ${{ steps.https_verified.outputs.HTTPS_SETUP == 'false' }}
+          env:
+            SSL_KEY: ${{ steps.get_cert_and_key.outputs.SSL_KEY }}
+            SSL_CERT: ${{ steps.get_cert_and_key.outputs.SSL_CERT }}
+          run: |
+            aws secretsmanager \
+            put-secret-value \
+            --secret-id SSL_KEY_DEV \
+            --secret-string $SSL_KEY
+            aws secretsmanager \
+            put-secret-value \
+            --secret-id SSL_CERT_DEV \
+            --secret-string $SSL_CERT
+
 
   Set-Version-In-Repo:
     runs-on: ubuntu-latest
