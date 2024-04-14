@@ -265,11 +265,14 @@ jobs:
           # since out docker container has DOMAIN set as an env,
           # due to how getssl is written, we dont need to specify it
           script: |
+            cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
+            SSL_CERT_DIRECTORY="/etc/ssl/certs/"
+            SSL_KEY_DIRECTORY="/etc/ssl/private/"
+            SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
             if true | openssl s_client -connect ${{ env.DOMAIN }}:443 2>/dev/null | \
-            openssl x509 -noout -checkend 0; then
+            openssl x509 -noout -checkend 0 && openssl verify $SSL_CERT_DIRECTORY/$DOMAIN.crt; then
               echo "HTTPS is working correctly"
             else
-              cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
               rm ${{ env.SSL_CERT_DIRECTORY }}/${DOMAIN}.crt
               apt-get update
               apt-get -y install dnsutils
@@ -287,9 +290,6 @@ jobs:
               sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/#RELOAD_CMD=\"[^\"]*\"/RELOAD_CMD=\"\/etc\/init.d\/nginx reload\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              SSL_CERT_DIRECTORY="/etc/ssl/certs/"
-              SSL_KEY_DIRECTORY="/etc/ssl/private/"
-              SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
               sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY//\//\\\/}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY//\//\\\/}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
               sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY//\//\\\/}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
@@ -319,8 +319,8 @@ jobs:
               -H "X-GitHub-Api-Version: 2022-11-28" \
               https://api.github.com/repos/${{ github.repository }}/actions/secrets/SSL_KEY_DEV \
               -d "{\"encrypted_value\":\"${SSL_KEY}",\"key_id\":\"${KEY_ID}\"}"
-            EOF
             fi
+            EOF
 
   Set-Version-In-Repo:
     runs-on: ubuntu-latest
