@@ -222,8 +222,12 @@ jobs:
           grep -o -P "(?<=\"SecretString\": \")[^\"]*\"")
           SSL_CERT=$(aws secretsmanager get-secret-value --secret-id portfolio/dev/ssl_cert | \
           grep -o -P "(?<=\"SecretString\": \")[^\"]*\"")
-          sudo mkdir -p ${SSL_CERT_DIRECTORY}
-          sudo mkdir -p ${SSL_KEY_DIRECTORY}
+          if [ ! -d ${SSL_CERT_DIRECTORY} ]; then
+            sudo mkdir -p ${SSL_CERT_DIRECTORY}
+          fi
+          if [ ! -d ${SSL_KEY_DIRECTORY} ]; Then
+            sudo mkdir -p ${SSL_KEY_DIRECTORY}
+          fi
           sudo echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
           sudo echo "$SS_KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
 
