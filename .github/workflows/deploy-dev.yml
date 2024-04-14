@@ -103,6 +103,10 @@ jobs:
       build: ${{ steps.version-outputs.outputs.BUILD }}
       version: ${{ steps.version-outputs.outputs.VERSION }}
 
+    # This is required for requesting the JWT from AWS
+    permissions:
+      id-token: write
+
     env:
       ENV_CONFIG_PATH: envs/testing/
       ENV_CONFIG_FILE: settings.yml
@@ -211,7 +215,7 @@ jobs:
         with:
             aws-region: ${{ needs.get_env_vars_from_repo.outputs.aws_zone }}
             role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
-  
+
       - name: Get ssl cert and key from AWS
         run: |
           SSL_KEY=$(aws secretsmanager get-secret-value --secret-id SSL_KEY_DEV | \
@@ -247,6 +251,10 @@ jobs:
   Verify_HTTPS:
     runs-on: ubuntu-latest
     needs: [EC2-Deploy, Get_EC2_IP, get_env_vars_from_repo]
+
+    # This is required for requesting the JWT from AWS
+    permissions:
+      id-token: write
 
     steps:
       - name: Check if HTTPS is configured correctly
