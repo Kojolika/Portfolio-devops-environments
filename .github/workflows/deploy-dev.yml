@@ -299,8 +299,8 @@ jobs:
           # due to how getssl is written, we dont need to specify it
           script: |
             CERT_AND_KEY=$(cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
-            rm ${{ SSL_CERT_DIRECTORY }}/${DOMAIN}.crt
-            rm ${{ SSL_KEY_DIRECTORY }}/${DOMAIN}.key
+            rm ${{ env.SSL_CERT_DIRECTORY }}/${DOMAIN}.crt
+            rm ${{ env.SSL_KEY_DIRECTORY }}/${DOMAIN}.key
             apt-get update
             apt-get -y install dnsutils
             cd ~
@@ -317,15 +317,15 @@ jobs:
             sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
             sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
             sed -i -E "s/#RELOAD_CMD=\"[^\"]*\"/RELOAD_CMD=\"\/etc\/init.d\/nginx reload\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-            SSL_CERT_DIRECTORY=${{ SSL_CERT_DIRECTORY }}
-            SSL_KEY_DIRECTORY=${{ SSL_KEY_DIRECTORY }}
-            SSL_ACME_DIRECTORY=${{ SSL_ACME_DIRECTORY }}
+            SSL_CERT_DIRECTORY=${{ env.SSL_CERT_DIRECTORY }}
+            SSL_KEY_DIRECTORY=${{ env.SSL_KEY_DIRECTORY }}
+            SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
             sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY//\//\\\/}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
             sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY//\//\\\/}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
             sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY//\//\\\/}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
             ./getssl
-            echo "SSL_KEY=$(cat ${{ SSL_CERT_DIRECTORY }}/$DOMAIN.key)"
-            echo "SSL_CERT=$(cat ${{ SSL_CERT_DIRECTORY }}/$DOMAIN.crt)"
+            echo "SSL_KEY=$(cat ${{ env.SSL_CERT_DIRECTORY }}/$DOMAIN.key)"
+            echo "SSL_CERT=$(cat ${{ env.SSL_CERT_DIRECTORY }}/$DOMAIN.crt)"
             EOF
             )
             SSL_KEY=$(echo "$CERT_AND_KEY" | grep -o -P "(?<=SSL_KEY=).*")
@@ -333,27 +333,27 @@ jobs:
             echo "SSL_KEY=$SSL_KEY" >> "$GITHUB_OUTPUT"
             echo "SSL_CERT=$SSL_CERT" >> "$GITHUB_OUTPUT"
 
-        - name: Configure AWS Credentials
-          uses: aws-actions/configure-aws-credentials@v4
-          if: ${{ steps.https_verified.outputs.HTTPS_SETUP == 'false' }}
-          with:
-            aws-region: ${{ needs.get_env_vars_from_repo.outputs.aws_zone }}
-            role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        if: ${{ steps.https_verified.outputs.HTTPS_SETUP == 'false' }}
+        with:
+          aws-region: ${{ needs.get_env_vars_from_repo.outputs.aws_zone }}
+          role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
 
-        - name: update AWS secrets
-          if: ${{ steps.https_verified.outputs.HTTPS_SETUP == 'false' }}
-          env:
-            SSL_KEY: ${{ steps.get_cert_and_key.outputs.SSL_KEY }}
-            SSL_CERT: ${{ steps.get_cert_and_key.outputs.SSL_CERT }}
-          run: |
-            aws secretsmanager \
-            put-secret-value \
-            --secret-id SSL_KEY_DEV \
-            --secret-string $SSL_KEY
-            aws secretsmanager \
-            put-secret-value \
-            --secret-id SSL_CERT_DEV \
-            --secret-string $SSL_CERT
+      - name: update AWS secrets
+        if: ${{ steps.https_verified.outputs.HTTPS_SETUP == 'false' }}
+        env:
+          SSL_KEY: ${{ steps.get_cert_and_key.outputs.SSL_KEY }}
+          SSL_CERT: ${{ steps.get_cert_and_key.outputs.SSL_CERT }}
+        run: |
+          aws secretsmanager \
+          put-secret-value \
+          --secret-id SSL_KEY_DEV \
+          --secret-string $SSL_KEY
+          aws secretsmanager \
+          put-secret-value \
+          --secret-id SSL_CERT_DEV \
+          --secret-string $SSL_CERT
 
 
   Set-Version-In-Repo:
