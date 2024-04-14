@@ -262,17 +262,17 @@ jobs:
           username: ${{ env.EC2_USERNAME }}
           key: ${{ env.SSH_KEY }}
           script: |
-          IS_HTTPS_SETUP=$(cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
-          if true | openssl s_client -connect $DOMAIN:443 2>/dev/null | \
-          openssl x509 -noout -checkend 0 && openssl verify ${{ env.SSL_CERT_DIRECTORY }}/$DOMAIN.crt; then
-            HTTPS_SETUP='true'
-          else
-            HTTPS_SETUP='false'
-          fi
-          echo "$HTTPS_SETUP"
-          EOF
-          )
-          echo "HTTPS_SETUP=$IS_HTTPS_SETUP" >> "$GITHUB_OUTPUT"
+            IS_HTTPS_SETUP=$(cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
+            if true | openssl s_client -connect $DOMAIN:443 2>/dev/null | \
+            openssl x509 -noout -checkend 0 && openssl verify ${{ env.SSL_CERT_DIRECTORY }}/$DOMAIN.crt; then
+              HTTPS_SETUP='true'
+            else
+              HTTPS_SETUP='false'
+            fi
+            echo "$HTTPS_SETUP"
+            EOF
+            )
+            echo "HTTPS_SETUP=$IS_HTTPS_SETUP" >> "$GITHUB_OUTPUT"
 
       - name: create new cert and key
         uses: appleboy/ssh-action@v1.0.3
