@@ -273,7 +273,8 @@ jobs:
             openssl x509 -noout -checkend 0 && openssl verify $SSL_CERT_DIRECTORY/$DOMAIN.crt; then
               echo "HTTPS is working correctly"
             else
-              rm ${{ env.SSL_CERT_DIRECTORY }}/${DOMAIN}.crt
+              set -x
+              rm $SSL_CERT_DIRECTORY/${DOMAIN}.crt
               apt-get update
               apt-get -y install dnsutils
               cd ~
@@ -297,14 +298,14 @@ jobs:
               SSL_CERT=${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
               SSL_KEY=${SSL_KEY_DIRECTORY}/${DOMAIN}.key
               echo "Getting key id for Github API secrets..."
-              KEY_ID=$(curl -L \
+              KEY_ID=$(curl -i -L \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ env.TOKEN }}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               https://api.github.com/repos/OWNER/REPO/actions/secrets/public-key \
               | grep -P -o "(?<=\"key_id\":\")[^\"]*(?=\")")
               echo "Updating ssl cert secret..."
-              curl -L \
+              curl -i -L \
               -X PUT \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ env.TOKEN }}" \
@@ -312,7 +313,7 @@ jobs:
               https://api.github.com/repos/${{ github.repository }}/actions/secrets/SSL_CERT_DEV \
               -d "{\"encrypted_value\":\"${SSL_CERT}",\"key_id\":\"${KEY_ID}\"}"
               echo "Updating ssl key secret..."
-              curl -L \
+              curl -i -L \
               -X PUT \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${{ env.TOKEN }}" \
