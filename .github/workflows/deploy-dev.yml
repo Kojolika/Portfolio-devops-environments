@@ -266,8 +266,8 @@ jobs:
           # due to how getssl is written, we dont need to specify it
           script: |
             cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
-            SSL_CERT_DIRECTORY="/etc/ssl/certs/"
-            SSL_KEY_DIRECTORY="/etc/ssl/private/"
+            SSL_CERT_DIRECTORY="/etc/ssl/certs"
+            SSL_KEY_DIRECTORY="/etc/ssl/private"
             SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
             if true | openssl s_client -connect $DOMAIN:443 2>/dev/null | \
             openssl x509 -noout -checkend 0 && openssl verify $SSL_CERT_DIRECTORY/$DOMAIN.crt; then
