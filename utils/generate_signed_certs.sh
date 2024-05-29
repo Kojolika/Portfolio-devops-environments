@@ -23,24 +23,27 @@ ENV_REPO_FOLDER=
 
 # Preconfigured
 REPO_NAME="Portfolio-devops-environments"
+rm -rf $REPO_NAME
 git clone https://github.com/Kojolika/$REPO_NAME
-cd $REPO_NAME
+
+CURRENT_DIR=$(pwd)
 
 # Settings shared across all environments
-BASE_SETTINGS_FOLDER="base"
-BASE_SETTINGS_FILE="$BASE_SETTINGS_FOLDER/settings.yml"
+BASE_SETTINGS_FOLDER="$REPO_NAME/base"
+SETTINGS_FILE="settings.yml"
 cd $BASE_SETTINGS_FOLDER
-SSL_CERT_DIRECTORY=$(yq '.deployment.ssl.directories.cert' $BASE_SETTINGS_FILE)
-SSL_KEY_DIRECTORY=$(yq '.deployment.ssl.directories.key' $BASE_SETTINGS_FILE)
-SSL_ACME_DIRECTORY=$(yq '.deployment.ssl.directories.acme-challenge' $BASE_SETTINGS_FILE)
-BASE_DOMAIN=$(yq '.deployment.domain' $BASE_SETTINGS_FILE)
+SSL_CERT_DIRECTORY=$(yq '.deployment.ssl.directories.cert' $SETTINGS_FILE)
+SSL_KEY_DIRECTORY=$(yq '.deployment.ssl.directories.key' $SETTINGS_FILE)
+SSL_ACME_DIRECTORY=$(yq '.deployment.ssl.directories.acme-challenge' $SETTINGS_FILE)
+BASE_DOMAIN=$(yq '.deployment.domain' $SETTINGS_FILE)
+
+cd $CURRENT_DIR
 
 # env specific settings
-ENV_SPECIFIC_FOLDER="envs/$ENV_REPO_FOLDER"
-ENV_SPECIFIC_SETTINGS_FILE="$ENV_SPECIFIC_FOLDER/settings.yml"
+ENV_SPECIFIC_FOLDER="$REPO_NAME/envs/$ENV_REPO_FOLDER"
 cd $ENV_SPECIFIC_FOLDER
-ENVIRONMENT=$(yq '.specifics | load(.deployment) | .app.environment' $ENV_SPECIFIC_SETTINGS_FILE)
-SUB_DOMAIN=$(yq '.specifics | load(.deployment) | .app.subdomain' $ENV_SPECIFIC_SETTINGS_FILE)
+ENVIRONMENT=$(yq '.specifics | load(.deployment) | .app.environment' $SETTINGS_FILE)
+SUB_DOMAIN=$(yq '.specifics | load(.deployment) | .app.subdomain' $SETTINGS_FILE)
 if [[ ! -z $SUB_DOMAIN ]]; then
     SUB_DOMAIN="$SUB_DOMAIN."
 fi
