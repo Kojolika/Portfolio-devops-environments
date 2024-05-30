@@ -68,6 +68,7 @@ jobs:
     # This is required for requesting the JWT from AWS
     permissions:
       id-token: write
+      contents: read
     
     env:
       AWS_ZONE: ${{ needs.get_env_vars_from_repo.outputs.aws_zone }}
@@ -106,6 +107,7 @@ jobs:
     # This is required for requesting the JWT from AWS
     permissions:
       id-token: write
+      contents: read
 
     env:
       ENV_CONFIG_PATH: envs/testing/
