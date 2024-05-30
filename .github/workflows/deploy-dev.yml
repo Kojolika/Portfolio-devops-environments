@@ -230,6 +230,7 @@ jobs:
           if [ ! -d ${SSL_KEY_DIRECTORY} ]; then
             sudo mkdir -p ${SSL_KEY_DIRECTORY}
           fi
+          ls -l
           sudo echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
           sudo echo "$SS_KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
 
