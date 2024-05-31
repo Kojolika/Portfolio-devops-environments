@@ -231,8 +231,8 @@ jobs:
             sudo mkdir -p ${SSL_KEY_DIRECTORY}
           fi
           ls -l
-          sudo chmod 666 ${SSL_CERT_DIRECTORY}
-          sudo chmod 666 ${SSL_CERT_DIRECTORY}
+          sudo chown ${USER} ${SSL_CERT_DIRECTORY}
+          sudo chmod ${USER} ${SSL_KEY_DIRECTORY}
           sudo echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
           sudo echo "$SS_KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
 
