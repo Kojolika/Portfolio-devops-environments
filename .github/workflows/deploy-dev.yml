@@ -234,13 +234,13 @@ jobs:
           sudo chown ${USER} ${SSL_KEY_DIRECTORY}
           echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
           echo "$SSL_KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
-          ls ${SSL_CERT_DIRECTORY}
-          ls ${SSL_KEY_DIRECTORY}
 
       - name: run commands on ec2 through ssh
         env:
           EC2_CONTEXT: ec2
         run: |
+          ls ${SSL_CERT_DIRECTORY}
+          ls ${SSL_KEY_DIRECTORY}
           cd $APP_REPO_CHECKOUT_PATH
           docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
           docker context use $EC2_CONTEXT
