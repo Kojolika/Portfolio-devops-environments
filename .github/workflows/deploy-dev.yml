@@ -230,11 +230,12 @@ jobs:
           if [ ! -d ${SSL_KEY_DIRECTORY} ]; then
             sudo mkdir -p ${SSL_KEY_DIRECTORY}
           fi
-          ls -l
           sudo chown ${USER} ${SSL_CERT_DIRECTORY}
           sudo chown ${USER} ${SSL_KEY_DIRECTORY}
-          sudo echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
-          sudo echo "$SS_KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
+          echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
+          echo "$SSL_KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
+          ls ${SSL_CERT_DIRECTORY}
+          ls ${SSL_KEY_DIRECTORY}
 
       - name: run commands on ec2 through ssh
         env:
