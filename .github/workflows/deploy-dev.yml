@@ -198,7 +198,6 @@ jobs:
           ENVIRONMENT: ${{ needs.get_env_vars_from_repo.outputs.environment }}
           DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
         run: |
-          cd ${GITHUB_WORKSPACE}
           cd $APP_REPO_CHECKOUT_PATH
           echo "ENVIRONMENT=$ENVIRONMENT" >> .env
           echo "NODE_ENV=$ENVIRONMENT" >> .env
