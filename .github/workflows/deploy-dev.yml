@@ -245,6 +245,7 @@ jobs:
         env:
           EC2_CONTEXT: ec2
         run: |
+          cd $APP_REPO_CHECKOUT_PATH
           cat ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
           docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
           docker context use $EC2_CONTEXT
