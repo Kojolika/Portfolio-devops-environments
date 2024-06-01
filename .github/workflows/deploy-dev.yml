@@ -228,29 +228,17 @@ jobs:
   
   Verify_HTTPS:
     runs-on: ubuntu-latest
-    needs: [EC2-Deploy, Get_EC2_IP, get_env_vars_from_repo]
-
+    needs: [EC2-Deploy, get_env_vars_from_repo]
+    env:
+      DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
     steps:
-      - name: ssh and add https if needed
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
-          EC2_IP: ${{ needs.Get_EC2_IP.outputs.ec2-ip }}
-          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-        with:
-          host: ${{ env.EC2_IP }}
-          username: ${{ env.EC2_USERNAME }}
-          key: ${{ env.SSH_KEY }}
-          # regarding use of getssl, typically we would need to specify the domain name but 
-          # since out docker container has DOMAIN set as an env,
-          # due to how getssl is written, we dont need to specify it
-          script: |
-            set -x
-            cat <<'EOF' | docker exec -i app_nginx_1 /bin/bash
-            if curl https://${DOMAIN}; then
-              echo "HTTPS is working correctly"
-            else
-              exit 1;
+      - name: check https
+        run: |
+          if curl https://${DOMAIN}; then
+          echo "HTTPS is working correctly"
+          else
+          exit 1
+
 
   Set-Version-In-Repo:
     runs-on: ubuntu-latest
