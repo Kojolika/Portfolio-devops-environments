@@ -238,12 +238,13 @@ jobs:
           echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
           echo "$SSL_KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
           echo "$SSL_CERT"
+          echo "FILE:"
+          cat ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
 
       - name: run commands on ec2 through ssh
         env:
           EC2_CONTEXT: ec2
         run: |
-          cd $APP_REPO_CHECKOUT_PATH
           cat ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
           docker context create $EC2_CONTEXT --docker "host=ssh://${EC2_USERNAME}@${EC2_IP}"
           docker context use $EC2_CONTEXT
