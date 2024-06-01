@@ -240,6 +240,11 @@ jobs:
           echo "$SSL_CERT"
           echo "FILE:"
           cat ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
+          
+      - name: test cert
+        run: |
+          cd $APP_REPO_CHECKOUT_PATH
+          cat ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
 
       - name: run commands on ec2 through ssh
         env:
