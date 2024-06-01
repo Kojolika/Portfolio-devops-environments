@@ -206,15 +206,6 @@ jobs:
           echo "SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY}" >> .env
           echo "SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY}" >> .env
 
-      - name: set up temp crt and key files
-        run: |
-          cd $APP_REPO_CHECKOUT_PATH
-          mkdir -p ${SSL_CERT_DIRECTORY}
-          mkdir -p ${SSL_KEY_DIRECTORY}
-          touch ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
-          touch ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
-          openssl req -nodes -new -x509 -subj "/CN=localhost" -keyout ${SSL_KEY_DIRECTORY}${DOMAIN}.key -out ${SSL_CERT_DIRECTORY}${DOMAIN}.crt
-
       - name: run commands on ec2 through ssh
         env:
           EC2_CONTEXT: ec2
@@ -226,13 +217,12 @@ jobs:
           docker-compose down
           docker system prune -a -f
           docker-compose up -d
-          docker compose push nginx
 
-      - name: check if both containers are running
+      - name: check if all containers are running
         # We subtract 1 since we're counting the lines of the stdin, the first line is the table header
         run: |
           NUM_CONTAINERS=$(($(docker ps | wc -l) - 1))
-          if(( NUM_CONTAINERS < 2 )); then
+          if(( NUM_CONTAINERS <  )); then
             exit 1;
           fi
   
@@ -244,15 +234,9 @@ jobs:
       - name: ssh and add https if needed
         uses: appleboy/ssh-action@v1.0.3
         env:
-          INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID_DEV }}
-          DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
-          SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
-          SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
-          SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
           EC2_USERNAME: ${{ secrets.EC2_USERNAME_DEV }}
           EC2_IP: ${{ needs.Get_EC2_IP.outputs.ec2-ip }}
           SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
-          ENVIRONMENT: ${{ needs.get_env_vars_from_repo.outputs.environment }}
         with:
           host: ${{ env.EC2_IP }}
           username: ${{ env.EC2_USERNAME }}
@@ -266,35 +250,7 @@ jobs:
             if curl https://${DOMAIN}; then
               echo "HTTPS is working correctly"
             else
-              rm ${{ env.SSL_CERT_DIRECTORY }}/${DOMAIN}.crt
-              apt-get update
-              apt-get -y install dnsutils
-              cd ~
-              curl --silent https://raw.githubusercontent.com/srvrco/getssl/latest/getssl > getssl
-              chmod 700 getssl
-              ./getssl -c
-              SSL_CONFIG=~/.getssl/getssl.cfg
-              SSL_DOMAIN_SPECIFIC_CONFIG=~/.getssl/${DOMAIN}/getssl.cfg
-              sed -i -E "s/#ACCOUNT_EMAIL=\"[^\"]*\"/ACCOUNT_EMAIL=\"${{ env.DOMAIN_EMAIL }}\"/" $SSL_CONFIG
-              if [[ ${{ env.ENVIRONMENT }} = 'production' ]]; then
-                sed -i 's/CA="https://acme-staging-v02.api.letsencrypt.org"/#CA="https://acme-staging-v02.api.letsencrypt.org"/' $SSL_CONFIG
-                sed -i 's/#CA="https://acme-v02.api.letsencrypt.org"/CA="https://acme-v02.api.letsencrypt.org"/' $SSL_CONFIG
-              fi
-              sed -i -E "s/#USE_SINGLE_ACL=\"[^\"]*\"/USE_SINGLE_ACL=\"true\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/SANS=\"[^\"]*\"/SANS=\"\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#RELOAD_CMD=\"[^\"]*\"/RELOAD_CMD=\"\/etc\/init.d\/nginx reload\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              SSL_CERT_DIRECTORY="/etc/ssl/certs/"
-              SSL_KEY_DIRECTORY="/etc/ssl/private/"
-              SSL_ACME_DIRECTORY=${{ env.SSL_ACME_DIRECTORY }}
-              SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY//\//\\\/}
-              SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY//\//\\\/}
-              SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY//\//\\\/}
-              sed -i -E "s/#ACL=\(.*/ACL=(\"${SSL_ACME_DIRECTORY}\")/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#DOMAIN_CERT_LOCATION=\"[^\"]*\"/DOMAIN_CERT_LOCATION=\"${SSL_CERT_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              sed -i -E "s/#DOMAIN_KEY_LOCATION=\"[^\"]*\"/DOMAIN_KEY_LOCATION=\"${SSL_KEY_DIRECTORY}\"/" $SSL_DOMAIN_SPECIFIC_CONFIG
-              ./getssl
-            fi
-            EOF
+              exit 1;
 
   Set-Version-In-Repo:
     runs-on: ubuntu-latest
