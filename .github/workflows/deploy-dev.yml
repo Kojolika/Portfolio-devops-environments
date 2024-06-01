@@ -218,12 +218,15 @@ jobs:
             role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
 
       - name: Get ssl cert and key from AWS
+        env:
+          AWS_SECRET_KEY_SSL_CERT_DEV: ${{ secrets.AWS_SECRET_KEY_SSL_CERT_DEV }}
+          AWS_SECRET_KEY_SSL_KEY_DEV: ${{ secrets.AWS_SECRET_KEY_SSL_KEY_DEV }}
         run: |
           cd $APP_REPO_CHECKOUT_PATH
           SSL_KEY=$(aws secretsmanager get-secret-value --secret-id portfolio/dev/ssl_key | \
-          grep -o -P "(?<=\"SecretString\": \")[^}\",]*\"")
+          grep -o -P '(?<="SecretString": "{\\"'"${AWS_SECRET_KEY_SSL_KEY_DEV}"'\\":\\")(?!\\"}",)[^\\]*')
           SSL_CERT=$(aws secretsmanager get-secret-value --secret-id portfolio/dev/ssl_cert | \
-          grep -o -P "(?<=\"SecretString\": \")[^}\",]*\"")
+          grep -o -P '(?<="SecretString": "{\\"'"${AWS_SECRET_KEY_SSL_CERT_DEV}"'\\":\\")(?!\\"}",)[^\\]*')
           if [ ! -d ${SSL_CERT_DIRECTORY} ]; then
             sudo mkdir -p ${SSL_CERT_DIRECTORY}
           fi
@@ -234,7 +237,6 @@ jobs:
           sudo chown ${USER} ${SSL_KEY_DIRECTORY}
           echo "$SSL_CERT" > ${SSL_CERT_DIRECTORY}/${DOMAIN}.crt
           echo "$SSL_KEY" > ${SSL_KEY_DIRECTORY}/${DOMAIN}.key
-          echo "$SSL_CERT"
 
       - name: run commands on ec2 through ssh
         env:
