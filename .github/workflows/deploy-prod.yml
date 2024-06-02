@@ -2,7 +2,7 @@ name: Deploy App to Production Server
 
 on:
   push:
-    paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
+   # paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
 
 permissions:
   contents: write
@@ -82,6 +82,10 @@ jobs:
     outputs:
       build: ${{ steps.version-outputs.outputs.BUILD }}
       version: ${{ steps.version-outputs.outputs.VERSION }}
+      
+    # This is required for requesting the JWT from AWS
+    permissions:
+      id-token: write
 
     env:
       ENV_CONFIG_PATH: envs/prod/
