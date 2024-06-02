@@ -96,7 +96,7 @@ jobs:
             echo "Docker installed"
           else
             echo "Installing docker"
-            yum install -y ${{ env.DOCKER_PACKAGE_NAME }}
+            sudo yum install -y ${{ env.DOCKER_PACKAGE_NAME }}
           fi
 
           # verify docker compose is installed
@@ -104,7 +104,7 @@ jobs:
             echo "Docker compose installed"
           else
             echo "Installing docker compose"
-            yum install -y ${{ env.DOCKER_COMPOSE_PACKAGE_NAME }}
+            sudo yum install -y ${{ env.DOCKER_COMPOSE_PACKAGE_NAME }}
           fi
 
           # verify docker user group is created
