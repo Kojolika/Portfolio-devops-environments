@@ -4,7 +4,7 @@ on:
   push:
     paths: ['envs/testing/settings.yml', 'envs/testing/deployment.yml']
   repository_dispatch:
-    types: [pr-merged-to-main]
+      types: [pr-merged-to-main]
 
 permissions:
   contents: write
@@ -14,12 +14,9 @@ jobs:
     runs-on: ubuntu-latest
 
     outputs:
-      domain: ${{ steps.dev_specific_variables.outputs.domain }}
-      environment: ${{ steps.dev_specific_variables.outputs.environment }}
-      aws_zone: ${{ steps.dev_specific_variables.outputs.aws_zone }}
-      ssl_cert_directory: ${{ steps.base_variables.outputs.ssl_cert_directory }}
-      ssl_key_directory: ${{ steps.base_variables.outputs.ssl_key_directory }}
-      ssl_acme_directory: ${{ steps.base_variables.outputs.ssl_acme_directory }}
+      domain: ${{ steps.env_specific_variables.outputs.domain }}
+      environment: ${{ steps.env_specific_variables.outputs.environment }}
+      aws_zone: ${{ steps.env_specific_variables.outputs.aws_zone }}
 
     env:
       BASE_SETTINGS_FILE: ./base/settings.yml
@@ -34,7 +31,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: output specific env variables
-        id: dev_specific_variables
+        id: env_specific_variables
         run: |
           BASE_DOMAIN=$(yq '.deployment.domain' $BASE_SETTINGS_FILE)
           cd $DEV_SETTINGS_FOLDER
@@ -47,16 +44,6 @@ jobs:
           echo "environment=$ENVIRONMENT" >> "$GITHUB_OUTPUT"
           AWS_ZONE=$(yq '.app.aws-zone' deployment.yml)
           echo "aws_zone=$AWS_ZONE" >> "$GITHUB_OUTPUT"
-
-      - name: output base env variables
-        id: base_variables
-        run: |
-          CERT_DIRECTORY=$(yq '.deployment.ssl.directories.cert' $BASE_SETTINGS_FILE)
-          KEY_DIRECTORY=$(yq '.deployment.ssl.directories.key' $BASE_SETTINGS_FILE)
-          ACME_CHALLENGE_DIRECTORY=$(yq '.deployment.ssl.directories.acme-challenge' $BASE_SETTINGS_FILE)
-          echo "ssl_cert_directory=$CERT_DIRECTORY" >> "$GITHUB_OUTPUT"
-          echo "ssl_key_directory=$KEY_DIRECTORY" >> "$GITHUB_OUTPUT"
-          echo "ssl_acme_directory=$ACME_CHALLENGE_DIRECTORY" >> "$GITHUB_OUTPUT"
 
   Get_EC2_IP:
     runs-on: ubuntu-latest
@@ -111,8 +98,6 @@ jobs:
       EC2_IP: ${{ needs.Get_EC2_IP.outputs.ec2-ip }}
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
-      SSL_CERT_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_cert_directory }}
-      SSL_KEY_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_key_directory }}
       DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
       SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
 
@@ -202,9 +187,6 @@ jobs:
           echo "LATEST_IMAGE=${DOCKER_REPO}:${IMAGE}" >> .env
           echo "DOMAIN=${DOMAIN}" >> .env
           echo "DOMAIN_EMAIL=${DOMAIN_EMAIL}" >> .env
-          echo "SSL_CERT_DIRECTORY=${SSL_CERT_DIRECTORY}" >> .env
-          echo "SSL_KEY_DIRECTORY=${SSL_KEY_DIRECTORY}" >> .env
-          echo "SSL_ACME_DIRECTORY=${SSL_ACME_DIRECTORY}" >> .env
 
       - name: run commands on ec2 through ssh
         env:
