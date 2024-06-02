@@ -2,7 +2,7 @@ name: Deploy App to Production Server
 
 on:
   push:
-    paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
+  #  paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
 
 permissions:
   contents: write
