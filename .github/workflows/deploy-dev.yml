@@ -2,7 +2,7 @@ name: Deploy App to Dev Server
 
 on:
   push:
-#  paths: ['envs/testing/settings.yml', 'envs/testing/deployment.yml']
+    paths: ['envs/testing/settings.yml', 'envs/testing/deployment.yml']
   repository_dispatch:
     types: [pr-merged-to-main]
 
@@ -222,7 +222,7 @@ jobs:
         # We subtract 1 since we're counting the lines of the stdin, the first line is the table header
         run: |
           NUM_CONTAINERS=$(($(docker ps | wc -l) - 1))
-          if(( NUM_CONTAINERS <  )); then
+          if(( NUM_CONTAINERS < 3 )); then
             exit 1;
           fi
   
@@ -235,10 +235,10 @@ jobs:
       - name: check https
         run: |
           if curl https://${DOMAIN}; then
-          echo "HTTPS is working correctly"
+            echo "HTTPS is working correctly"
           else
-          exit 1
-
+            exit 1
+          fi
 
   Set-Version-In-Repo:
     runs-on: ubuntu-latest
