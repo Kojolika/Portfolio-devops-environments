@@ -2,7 +2,7 @@ name: Deploy App to Production Server
 
 on:
   push:
-    paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
+  #  paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
 
 permissions:
   contents: write
@@ -80,16 +80,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - name: install docker, docker-compose and set user groupd
-      env:
-        DOCKER_GROUP: docker
-        DOCKER_PACKAGE_NAME: docker
-        DOCKER_COMPOSE_PACKAGE_NAME: docker-compose-plugin
       uses: appleboy/ssh-action@v1.0.3
       with:
         host: ${{ needs.get_ec2_ip.outputs.ec2-ip }}
         username: ${{ secrets.EC2_USERNAME_PROD }}
         key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
         port: 22
+        DOCKER_GROUP: docker
+        DOCKER_PACKAGE_NAME: docker
+        DOCKER_COMPOSE_PACKAGE_NAME: docker-compose-plugin
         script: |
           # verify docker is installed
           if [ -x "$(command -v ${DOCKER_PACKAGE_NAME})" ]; then
