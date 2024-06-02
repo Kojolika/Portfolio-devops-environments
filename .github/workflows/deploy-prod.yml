@@ -75,43 +75,9 @@ jobs:
           --output text)
           echo "EC2_IP=$EC2_IP" >> "$GITHUB_OUTPUT"
     
-
-  install_ec2_dependencies:
-    needs: [get_ec2_ip]
-    runs-on: ubuntu-latest
-    env:
-      DOCKER_GROUP: docker
-    steps:
-    - name: install docker, docker-compose and set user groupd
-      uses: appleboy/ssh-action@v1.0.3
-      with:
-        host: ${{ needs.get_ec2_ip.outputs.ec2-ip }}
-        username: ${{ secrets.EC2_USERNAME_PROD }}
-        key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
-        port: 22
-        script: |
-          # verify docker is installed
-          if [ -x "$(command -v docker)" ]; then
-            echo "Docker installed"
-          else
-            echo "Installing docker"
-            sudo yum install -y docker
-          fi
-
-          # verify docker compose is installed
-          if [ -x "$(command -v docker-compose)" ]; then
-            echo "Docker compose installed"
-          else
-            echo "Installing docker compose"
-            sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m) -o /usr/bin/docker-compose && sudo chmod 755 /usr/bin/docker-compose && docker-compose -v
-          fi
-
-          # verify docker user group is created
-          getent group ${{ env.DOCKER_GROUP }} || sudo groupadd ${{ env.DOCKER_GROUP }} && sudo usermod -aG ${{ env.DOCKER_GROUP }} ${USER} && sudo reboot
-
   ec2_deploy:
     runs-on: ubuntu-latest
-    needs: [get_env_vars_from_repo, get_ec2_ip, install_ec2_dependencies]
+    needs: [get_env_vars_from_repo, get_ec2_ip]
 
     outputs:
       build: ${{ steps.version-outputs.outputs.BUILD }}
@@ -197,6 +163,54 @@ jobs:
           eval `ssh-agent -s`
           ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
 
+      - name: get runner ip
+        id: get_runner_ip
+        uses: haythem/public-ip@v1.3
+      
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_ZONE }}
+          role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
+
+      - name: open ssh port for runner
+        env:
+          SECURITY_GROUP_ID: ${{ secrets.AWS_SEC_GROUP_ID_PROD }}
+          RUNNER_IP: ${{ steps.get_runner_ip.outputs.ipv4}}
+        run: |
+          aws ec2 authorize-security-group-ingress \
+          --group-id ${SECURITY_GROUP_ID} \
+          --port 22 \
+          --protocol tcp \
+          --cidr ${{ env.RUNNER_IP }}/32
+
+      - name: install docker, docker-compose and set user groupd
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ needs.get_ec2_ip.outputs.ec2-ip }}
+          username: ${{ secrets.EC2_USERNAME_PROD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
+          port: 22
+          script: |
+            # verify docker is installed
+            if [ -x "$(command -v docker)" ]; then
+              echo "Docker installed"
+            else
+              echo "Installing docker"
+              sudo yum install -y docker
+            fi
+    
+            # verify docker compose is installed
+            if [ -x "$(command -v docker-compose)" ]; then
+              echo "Docker compose installed"
+            else
+              echo "Installing docker compose"
+              sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m) -o /usr/bin/docker-compose && sudo chmod 755 /usr/bin/docker-compose && docker-compose -v
+            fi
+    
+            # verify docker user group is created
+            getent group ${{ env.DOCKER_GROUP }} || sudo groupadd ${{ env.DOCKER_GROUP }} && sudo usermod -aG ${{ env.DOCKER_GROUP }} ${USER} && sudo reboot
+
       - name: set env variables for docker-compose
         env:
           DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
@@ -214,27 +228,6 @@ jobs:
           echo "LATEST_IMAGE=${DOCKER_REPO}:${IMAGE}" >> .env
           echo "DOMAIN=${DOMAIN}" >> .env
           echo "DOMAIN_EMAIL=${DOMAIN_EMAIL}" >> .env
-          
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-region: ${{ env.AWS_ZONE }}
-          role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
-
-      - name: get runner ip
-        id: get_runner_ip
-        uses: haythem/public-ip@v1.3
-
-      - name: open ssh port for runner
-        env:
-          SECURITY_GROUP_ID: ${{ secrets.AWS_SEC_GROUP_ID_PROD }}
-          RUNNER_IP: ${{ steps.get_runner_ip.outputs.ipv4}}
-        run: |
-          aws ec2 authorize-security-group-ingress \
-          --group-id ${SECURITY_GROUP_ID} \
-          --port 22 \
-          --protocol tcp \
-          --cidr ${{ env.RUNNER_IP }}/32
 
       - name: run commands on ec2 through ssh
         env:
