@@ -224,7 +224,7 @@ jobs:
           echo "$DOCKER_PASSWORD" | docker login -u $DOCKER_USERNAME --password-stdin
           docker-compose down
           docker system prune -a -f
-          docker-compose up -d
+          docker-compose up -d --build
 
       - name: check if all containers are running
         # We subtract 1 since we're counting the lines of the stdin, the first line is the table header
