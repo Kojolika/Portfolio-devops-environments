@@ -80,8 +80,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DOCKER_GROUP: docker
-      DOCKER_PACKAGE_NAME: docker
-      DOCKER_COMPOSE_PACKAGE_NAME: docker-compose-plugin
     steps:
     - name: install docker, docker-compose and set user groupd
       uses: appleboy/ssh-action@v1.0.3
@@ -92,19 +90,19 @@ jobs:
         port: 22
         script: |
           # verify docker is installed
-          if [ -x "$(command -v ${{ env.DOCKER_PACKAGE_NAME }})" ]; then
+          if [ -x "$(command -v docker)" ]; then
             echo "Docker installed"
           else
             echo "Installing docker"
-            sudo yum install -y ${{ env.DOCKER_PACKAGE_NAME }}
+            sudo yum install -y docker
           fi
 
           # verify docker compose is installed
-          if [ -x "$(command -v ${{ env.DOCKER_COMPOSE_PACKAGE_NAME }})" ]; then
+          if [ -x "$(command -v docker-compose)" ]; then
             echo "Docker compose installed"
           else
             echo "Installing docker compose"
-            sudo yum install -y ${{ env.DOCKER_COMPOSE_PACKAGE_NAME }}
+            sudo curl -L https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m) -o /usr/bin/docker-compose && sudo chmod 755 /usr/bin/docker-compose && docker-compose -v
           fi
 
           # verify docker user group is created
