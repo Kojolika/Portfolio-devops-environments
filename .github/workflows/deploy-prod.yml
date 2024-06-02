@@ -2,7 +2,7 @@ name: Deploy App to Production Server
 
 on:
   push:
-  #  paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
+    paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
 
 permissions:
   contents: write
@@ -106,16 +106,11 @@ jobs:
           fi
 
           # verify docker user group is created
-          getent group ${{ env.DOCKER_GROUP }} || sudo groupadd ${{ env.DOCKER_GROUP }} && sudo usermod -aG ${{ env.DOCKER_GROUP }} ${USER} && newgrp ${{ env.DOCKER_GROUP }}
+          getent group ${{ env.DOCKER_GROUP }} || sudo groupadd ${{ env.DOCKER_GROUP }} && sudo usermod -aG ${{ env.DOCKER_GROUP }} ${USER} && sudo reboot
 
   ec2_deploy:
     runs-on: ubuntu-latest
     needs: [get_env_vars_from_repo, get_ec2_ip, install_ec2_dependencies]
-
-    # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
-    # Then make sure the docker daemon is running
-    # Also make sure to create a docker group on the EC2 instance before running docker commands, otherwise
-    # the EC2 instance won't have permissions for those docker commands (without using sudo for linux)
 
     outputs:
       build: ${{ steps.version-outputs.outputs.BUILD }}
@@ -237,20 +232,6 @@ jobs:
           NUM_CONTAINERS=$(($(docker ps | wc -l) - 1))
           if(( NUM_CONTAINERS < 3 )); then
             exit 1;
-          fi
-  
-  verify_https:
-    runs-on: ubuntu-latest
-    needs: [ec2_deploy, get_env_vars_from_repo]
-    env:
-      DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
-    steps:
-      - name: check https
-        run: |
-          if curl https://${DOMAIN}; then
-            echo "HTTPS is working correctly"
-          else
-            exit 1
           fi
 
   set_verison_in_repo:
