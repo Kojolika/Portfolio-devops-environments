@@ -2,4 +2,5 @@ app:
   name: prod
   target_dir: /app
   subdomain: ""
+  aws-zone: us-east-2
   environment: production
