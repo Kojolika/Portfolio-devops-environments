@@ -2,7 +2,7 @@ name: Deploy App to Production Server
 
 on:
   push:
-  #  paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
+    paths: ['envs/prod/settings.yml', 'envs/prod/deployment.yml', 'envs/prod/version.yml']
 
 permissions:
   contents: write
@@ -75,9 +75,13 @@ jobs:
           --output text)
           echo "EC2_IP=$EC2_IP" >> "$GITHUB_OUTPUT"
 
-  install-ec2-dependencies:
+  install_ec2_dependencies:
     needs: [get_ec2_ip]
     runs-on: ubuntu-latest
+    env:
+      DOCKER_GROUP: docker
+      DOCKER_PACKAGE_NAME: docker
+      DOCKER_COMPOSE_PACKAGE_NAME: docker-compose-plugin
     steps:
     - name: install docker, docker-compose and set user groupd
       uses: appleboy/ssh-action@v1.0.3
@@ -86,32 +90,29 @@ jobs:
         username: ${{ secrets.EC2_USERNAME_PROD }}
         key: ${{ secrets.SSH_PRIVATE_KEY_PROD }}
         port: 22
-        DOCKER_GROUP: docker
-        DOCKER_PACKAGE_NAME: docker
-        DOCKER_COMPOSE_PACKAGE_NAME: docker-compose-plugin
         script: |
           # verify docker is installed
-          if [ -x "$(command -v ${DOCKER_PACKAGE_NAME})" ]; then
+          if [ -x "$(command -v ${{ env.DOCKER_PACKAGE_NAME }})" ]; then
             echo "Docker installed"
           else
             echo "Installing docker"
-            yum install -y ${DOCKER_PACKAGE_NAME}
+            yum install -y ${{ env.DOCKER_PACKAGE_NAME }}
           fi
 
           # verify docker compose is installed
-          if [ -x "$(command -v ${DOCKER_COMPOSE_PACKAGE_NAME})" ]; then
+          if [ -x "$(command -v ${{ env.DOCKER_COMPOSE_PACKAGE_NAME }})" ]; then
             echo "Docker compose installed"
           else
             echo "Installing docker compose"
-            yum install -y ${DOCKER_COMPOSE_PACKAGE_NAME}
+            yum install -y ${{ env.DOCKER_COMPOSE_PACKAGE_NAME }}
           fi
 
           # verify docker user group is created
-          getent group ${DOCKER_GROUP} || sudo groupadd ${DOCKER_GROUP} && sudo usermod -aG ${DOCKER_GROUP} ${USER} && newgrp ${DOCKER_GROUP}
+          getent group ${{ env.DOCKER_GROUP }} || sudo groupadd ${{ env.DOCKER_GROUP }} && sudo usermod -aG ${{ env.DOCKER_GROUP }} ${USER} && newgrp ${{ env.DOCKER_GROUP }}
 
   ec2_deploy:
     runs-on: ubuntu-latest
-    needs: [get_env_vars_from_repo, get_ec2_ip]
+    needs: [get_env_vars_from_repo, get_ec2_ip, install_ec2_dependencies]
 
     # For this deploy to work correctly, the EC2 instance needs to have docker and docker-compose installed
     # Then make sure the docker daemon is running
