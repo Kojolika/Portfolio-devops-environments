@@ -3,4 +3,4 @@ build: 52
 spec:
   containers:
     - app-name: portfolio
-      image: latest-e28b92a41ed8ae25e07bae953b3218f94c8233fd
+      image: 0.1.12-36
