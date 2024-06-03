@@ -257,7 +257,8 @@ jobs:
           --group-id ${{ env.SECURITY_GROUP_ID }} \
           --port 22 \
           --protocol tcp \
-          --cidr ${{ env.RUNNER_IP }}/32
+          --cidr ${{ env.RUNNER_IP }}/32 \
+          &> /dev/null
 
       - name: check if all containers are running
         # We subtract 1 since we're counting the lines of the stdin, the first line is the table header
