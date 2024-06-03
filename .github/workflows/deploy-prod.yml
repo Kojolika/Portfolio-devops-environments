@@ -253,7 +253,7 @@ jobs:
           SECURITY_GROUP_ID: ${{ secrets.AWS_SEC_GROUP_ID_PROD }}
           RUNNER_IP: ${{ steps.get_runner_ip.outputs.ipv4}}
         run: |
-          aws revoke-security-group-ingress \
+          aws ec2 revoke-security-group-ingress \
           --group-id ${{ env.SECURITY_GROUP_ID }} \
           --port 22 \
           --protocol tcp \
