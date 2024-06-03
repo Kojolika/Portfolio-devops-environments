@@ -235,7 +235,7 @@ jobs:
           echo "LATEST_IMAGE=${DOCKER_REPO}:${IMAGE}" >> .env
           echo "DOMAIN=${DOMAIN}" >> .env
           echo "DOMAIN_EMAIL=${DOMAIN_EMAIL}" >> .env
-          echo "${NODE_ENV}"
+          cat .env
 
       - name: run commands on ec2 through ssh
         env:
