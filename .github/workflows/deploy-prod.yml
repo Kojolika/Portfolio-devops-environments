@@ -227,7 +227,6 @@ jobs:
         run: |
           cd ${GITHUB_WORKSPACE}
           cd $APP_REPO_CHECKOUT_PATH
-          echo "ENVIRONMENT=${ENVIRONMENT}" >> .env
           echo "NODE_ENV=${ENVIRONMENT}" >> .env
           echo "PORT=${PORT}" >> .env
           echo "AWS_ZONE=${AWS_ZONE}" >> .env
@@ -235,7 +234,6 @@ jobs:
           echo "LATEST_IMAGE=${DOCKER_REPO}:${IMAGE}" >> .env
           echo "DOMAIN=${DOMAIN}" >> .env
           echo "DOMAIN_EMAIL=${DOMAIN_EMAIL}" >> .env
-          cat .env
 
       - name: run commands on ec2 through ssh
         env:
