@@ -163,6 +163,7 @@ jobs:
           role-to-assume: arn:aws:iam::822477694772:role/Github-Actions
 
       - name: open ssh port for runner
+        id: open_port_for_runner
         env:
           SECURITY_GROUP_ID: ${{ secrets.AWS_SEC_GROUP_ID_PROD }}
           RUNNER_IP: ${{ steps.get_runner_ip.outputs.ipv4}}
@@ -222,7 +223,6 @@ jobs:
           DOCKER_REPO: ${{ secrets.DOCKER_REPO_URL }}
           ENVIRONMENT: ${{ needs.get_env_vars_from_repo.outputs.environment }}
           DOMAIN_EMAIL: ${{ secrets.DOMAIN_EMAIL }}
-          SSL_ACME_DIRECTORY: ${{ needs.get_env_vars_from_repo.outputs.ssl_acme_directory }}
         run: |
           cd ${GITHUB_WORKSPACE}
           cd $APP_REPO_CHECKOUT_PATH
@@ -248,13 +248,13 @@ jobs:
           docker-compose up -d
 
       - name: close ssh port for runner
-        if: ${{ !cancelled() }}
+        if: ${{ steps.get_runner_ip.outcome == success() }}
         env:
           SECURITY_GROUP_ID: ${{ secrets.AWS_SEC_GROUP_ID_PROD }}
           RUNNER_IP: ${{ steps.get_runner_ip.outputs.ipv4}}
         run: |
           aws revoke-security-group-ingress \
-          --group-id ${SECURITY_GROUP_ID} \
+          --group-id ${{ env.SECURITY_GROUP_ID }} \
           --port 22 \
           --protocol tcp \
           --cidr ${{ env.RUNNER_IP }}/32
