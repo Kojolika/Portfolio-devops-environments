@@ -190,6 +190,8 @@ jobs:
 
       - name: install docker, docker-compose and set user groupd
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DOCKER_GROUP: docker
         with:
           host: ${{ needs.get_ec2_ip.outputs.ec2-ip }}
           username: ${{ secrets.EC2_USERNAME_PROD }}
@@ -213,7 +215,7 @@ jobs:
             fi
     
             # verify docker user group is created
-            getent group ${{ env.DOCKER_GROUP }} || sudo groupadd ${{ env.DOCKER_GROUP }} && sudo usermod -aG ${{ env.DOCKER_GROUP }} ${USER} && sudo reboot
+            getent group ${{ env.DOCKER_GROUP }} || sudo groupadd ${{ env.DOCKER_GROUP }} && sudo usermod -aG ${{ env.DOCKER_GROUP }} ${USER} && newgrp ${{ env.DOCKER_GROUP }}
 
       - name: set env variables for docker-compose
         env:
@@ -246,6 +248,7 @@ jobs:
           docker-compose up -d
 
       - name: close ssh port for runner
+        if: ${{ !cancelled() }}
         env:
           SECURITY_GROUP_ID: ${{ secrets.AWS_SEC_GROUP_ID_PROD }}
           RUNNER_IP: ${{ steps.get_runner_ip.outputs.ipv4}}
