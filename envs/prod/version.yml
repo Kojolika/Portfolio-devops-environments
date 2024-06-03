@@ -1,5 +1,5 @@
-app-version: 0.1.30
-build: 54
+app-version: 0.1.32
+build: 56
 spec:
   containers:
     - app-name: portfolio
