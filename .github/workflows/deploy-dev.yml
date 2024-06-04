@@ -133,7 +133,6 @@ jobs:
       DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
       DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
       DOMAIN: ${{ needs.get_env_vars_from_repo.outputs.domain }}
-      SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
 
     steps:
       - name: setup yq
@@ -193,13 +192,14 @@ jobs:
       - name: set ssh identity on github runner
         env:
           SSH_PRIVATE_KEY_FILE: id_rsa
+          SSH_KEY: ${{ secrets.DEV_SSH_PRIVATE_KEY }}
         run: |
           SSH_DIR=~/.ssh
           mkdir -p $SSH_DIR
           chmod 700 $SSH_DIR
           cd $SSH_DIR
           ssh-keyscan $EC2_IP > known_hosts
-          echo ${{ env.SSH_KEY }} > $SSH_PRIVATE_KEY_FILE
+          echo "$SSH_KEY" > $SSH_PRIVATE_KEY_FILE
           chmod 600 *
           eval `ssh-agent -s`
           ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
