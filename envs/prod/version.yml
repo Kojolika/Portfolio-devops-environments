@@ -3,4 +3,4 @@ build: 56
 spec:
   containers:
     - app-name: portfolio
-      image: 1.0.0-57
+      image: 1.0.1-58
