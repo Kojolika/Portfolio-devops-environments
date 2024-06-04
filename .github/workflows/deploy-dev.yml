@@ -199,7 +199,7 @@ jobs:
           chmod 700 $SSH_DIR
           cd $SSH_DIR
           ssh-keyscan $EC2_IP > known_hosts
-          echo "${{ env.SSH_KEY }}" > $SSH_PRIVATE_KEY_FILE
+          echo ${{ env.SSH_KEY }} > $SSH_PRIVATE_KEY_FILE
           chmod 600 *
           eval `ssh-agent -s`
           ssh-add ${SSH_DIR}/${SSH_PRIVATE_KEY_FILE}
